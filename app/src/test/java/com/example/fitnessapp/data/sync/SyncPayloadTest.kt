@@ -89,4 +89,72 @@ class SyncPayloadTest {
         assertEquals("Wife", decoded.recipientScore?.userName)
         assertTrue(decoded.recipientScore!!.waterHit)
     }
+
+    @Test
+    fun testEnrichedUserDailyScoreAndDuelSummarySerialization() {
+        val score = UserDailyScore(
+            userId = "primary",
+            userName = "Pramod",
+            calorieBudget = 2200,
+            caloriesConsumed = 1900,
+            waterIntakeMl = 2500,
+            waterTargetMl = 3000,
+            currentWeightKg = 83.2f,
+            weightLostKg = 1.8f,
+            streakDays = 7,
+            proteinConsumedG = 135f,
+            proteinTargetG = 150f,
+            carbsConsumedG = 190f,
+            carbsTargetG = 220f,
+            fatConsumedG = 55f,
+            fatTargetG = 65f,
+            targetWeightKg = 72f,
+            startWeightKg = 85f,
+            isLiveSynced = true,
+            lastSyncTimestamp = 1710000000000L
+        )
+
+        val partnerScore = UserDailyScore(
+            userId = "partner",
+            userName = "Wife",
+            calorieBudget = 1600,
+            caloriesConsumed = 1450,
+            waterIntakeMl = 2200,
+            waterTargetMl = 2000,
+            currentWeightKg = 62.5f,
+            weightLostKg = 2.5f,
+            streakDays = 6,
+            proteinConsumedG = 95f,
+            proteinTargetG = 100f,
+            carbsConsumedG = 140f,
+            carbsTargetG = 160f,
+            fatConsumedG = 42f,
+            fatTargetG = 48f,
+            targetWeightKg = 55f,
+            startWeightKg = 65f,
+            isLiveSynced = true,
+            lastSyncTimestamp = 1710000000000L
+        )
+
+        val duel = com.example.fitnessapp.data.model.PartnerDuelSummary(
+            primaryUser = score,
+            partnerUser = partnerScore,
+            date = "2026-09-16",
+            isPartnerSynced = true
+        )
+
+        val encoded = json.encodeToString(duel)
+        val decoded = json.decodeFromString<com.example.fitnessapp.data.model.PartnerDuelSummary>(encoded)
+
+        assertTrue(decoded.isPartnerSynced)
+        assertEquals(135f, decoded.primaryUser.proteinConsumedG)
+        assertEquals(150f, decoded.primaryUser.proteinTargetG)
+        assertEquals(85f, decoded.primaryUser.startWeightKg)
+        assertTrue(decoded.primaryUser.isLiveSynced)
+        assertEquals(1710000000000L, decoded.primaryUser.lastSyncTimestamp)
+
+        assertEquals("Wife", decoded.partnerUser.userName)
+        assertEquals(95f, decoded.partnerUser.proteinConsumedG)
+        assertTrue(decoded.partnerUser.isLiveSynced)
+    }
 }

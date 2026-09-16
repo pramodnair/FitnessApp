@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.fitnessapp.FitnessApplication
 import com.example.fitnessapp.data.model.DailyNutritionSummary
 import com.example.fitnessapp.data.model.MealLog
+import com.example.fitnessapp.data.model.PartnerDuelSummary
 import com.example.fitnessapp.data.model.UserProfile
 import com.example.fitnessapp.data.repository.FitnessRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ class DashboardViewModel(
 
     val activeProfile: StateFlow<UserProfile> = repository.activeProfile
     val partnerProfile: StateFlow<UserProfile> = repository.partnerProfile
+    val partnerDuel: StateFlow<PartnerDuelSummary> = repository.partnerDuel
 
     private val _selectedDate = MutableStateFlow(getTodayDate())
     val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()

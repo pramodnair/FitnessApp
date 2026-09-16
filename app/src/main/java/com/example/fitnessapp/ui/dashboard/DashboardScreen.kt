@@ -54,11 +54,13 @@ fun DashboardScreen(
     onNavigateToScanner: () -> Unit,
     onNavigateToManualEntry: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToPartner: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val activeProfile by viewModel.activeProfile.collectAsStateWithLifecycle()
     val partnerProfile by viewModel.partnerProfile.collectAsStateWithLifecycle()
+    val partnerDuel by viewModel.partnerDuel.collectAsStateWithLifecycle()
     val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
     val displaySummary by viewModel.displaySummary.collectAsStateWithLifecycle()
     val displayMeals by viewModel.displayMeals.collectAsStateWithLifecycle()
@@ -82,11 +84,12 @@ fun DashboardScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Top profile switcher (Pramod / Wife) + Settings
+            // Top user identity badge + live partner Wi-Fi sync pill + Settings
             ProfileSwitcherHeader(
                 activeProfile = activeProfile,
-                partnerProfile = partnerProfile,
-                onSwitchUser = { viewModel.switchProfile(it) },
+                partnerName = partnerDuel.partnerUser.userName.ifBlank { partnerProfile.name.ifBlank { "Partner" } },
+                isPartnerSynced = partnerDuel.isPartnerSynced,
+                onNavigateToPartner = onNavigateToPartner,
                 onOpenSettings = onNavigateToSettings
             )
 

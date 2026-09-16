@@ -87,7 +87,8 @@ fun MainNavigation() {
                             BottomTab.DASHBOARD -> DashboardScreen(
                                 onNavigateToScanner = { backStack.add(ScannerNav) },
                                 onNavigateToManualEntry = { showManualEntryDialog = true },
-                                onNavigateToSettings = { backStack.add(SettingsNav) }
+                                onNavigateToSettings = { backStack.add(SettingsNav) },
+                                onNavigateToPartner = { currentTab = BottomTab.PARTNER_DUEL }
                             )
                             BottomTab.WEIGHT -> WeightTrackerScreen()
                             BottomTab.BODY_PROGRESS -> BodyProgressScreen()

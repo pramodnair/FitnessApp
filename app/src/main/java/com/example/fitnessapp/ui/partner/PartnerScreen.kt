@@ -1,8 +1,12 @@
 package com.example.fitnessapp.ui.partner
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -252,7 +256,9 @@ fun PartnerScreen(
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFF8E1))
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        )
                     ) {
                         Row(
                             modifier = Modifier.padding(18.dp),
@@ -280,26 +286,61 @@ fun PartnerScreen(
                                     text = "DAILY LEADERBOARD",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFF57F17),
+                                    color = MaterialTheme.colorScheme.primary,
                                     letterSpacing = 1.sp
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (duel.winnerName != null) "${duel.winnerName} is winning today! 🏆" else "It's a tie today! Keep pushing! 🔥",
+                                    text = if (duel.isPartnerSynced && duel.winnerName != null) {
+                                        "${duel.winnerName} is winning today! 🏆"
+                                    } else if (duel.isPartnerSynced) {
+                                        "It's a tie today! Keep pushing! 🔥"
+                                    } else {
+                                        "Today's Duel in Progress ⚔️"
+                                    },
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFF4E342E)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Score based on calorie budget adherence & healthy hydration.",
+                                    text = if (duel.isPartnerSynced) {
+                                        "Score based on calorie budget adherence & healthy hydration."
+                                    } else {
+                                        "Waiting for partner's Wi-Fi sync to compare scores."
+                                    },
                                     fontSize = 11.sp,
-                                    color = Color(0xFF8D6E63)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Sync Prompt Banner if partner not synced yet
+                    if (!duel.isPartnerSynced) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedSubTab = PartnerSubTab.SYNC },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Wi-Fi Sync with Partner", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    Text("Connect both phones to home Wi-Fi to sync your partner's live stats.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
 
                     // Head to Head Duel Cards
                     Row(
@@ -309,11 +350,13 @@ fun PartnerScreen(
                         UserDuelCard(
                             score = duel.primaryUser,
                             isWinning = duel.winnerName == duel.primaryUser.userName,
+                            isPrimaryUser = true,
                             modifier = Modifier.weight(1f)
                         )
                         UserDuelCard(
                             score = duel.partnerUser,
                             isWinning = duel.winnerName == duel.partnerUser.userName,
+                            isPrimaryUser = false,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -678,34 +721,46 @@ private fun WifiSyncStatusCard(
     pairCode: String,
     onEditPairCode: () -> Unit
 ) {
-    val (bgColor, icon, title, subtitle) = when (status) {
+    val (cardColor, iconColor, titleColor, subtitleColor, icon, title, subtitle) = when (status) {
         is SyncConnectionStatus.ConnectedWifi -> {
-            Tuple4(
-                Color(0xFFE8F5E9),
+            Tuple7(
+                Color(0xFF1B5E20).copy(alpha = 0.18f),
+                Color(0xFF4CAF50),
+                MaterialTheme.colorScheme.onSurface,
+                MaterialTheme.colorScheme.onSurfaceVariant,
                 Icons.Default.Wifi,
                 "Home Wi-Fi Live Sync Active 🟢",
                 "Connected to ${status.partnerName} (${status.partnerIp}). Instant peer sync active."
             )
         }
         is SyncConnectionStatus.SearchingWifi -> {
-            Tuple4(
-                Color(0xFFFFF8E1),
+            Tuple7(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                Color(0xFFFFB300),
+                MaterialTheme.colorScheme.onSurface,
+                MaterialTheme.colorScheme.onSurfaceVariant,
                 Icons.Default.Wifi,
                 "Wi-Fi Active — Searching for Partner 🟡",
                 "Listening for partner with pair code '$pairCode' on home Wi-Fi..."
             )
         }
         is SyncConnectionStatus.CloudFallback -> {
-            Tuple4(
-                Color(0xFFE1F5FE),
+            Tuple7(
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.onSurface,
+                MaterialTheme.colorScheme.onSurfaceVariant,
                 Icons.Default.CloudDone,
                 "Remote Mode (Cloud Sync Ready) 🌐",
                 status.statusMessage
             )
         }
         is SyncConnectionStatus.Disconnected -> {
-            Tuple4(
-                Color(0xFFF5F5F5),
+            Tuple7(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                MaterialTheme.colorScheme.outline,
+                MaterialTheme.colorScheme.onSurface,
+                MaterialTheme.colorScheme.onSurfaceVariant,
                 Icons.Default.WifiOff,
                 "Network Offline",
                 "Connect both phones to Wi-Fi to sync your fitness duel."
@@ -715,7 +770,7 @@ private fun WifiSyncStatusCard(
 
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = bgColor,
+        color = cardColor,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -725,37 +780,46 @@ private fun WifiSyncStatusCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = iconColor,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = titleColor)
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = subtitleColor
                 )
             }
         }
     }
 }
 
-private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+private data class Tuple7<A, B, C, D, E, F, G>(val a: A, val b: B, val c: C, val d: D, val e: E, val f: F, val g: G)
 
 @Composable
 private fun UserDuelCard(
     score: UserDailyScore,
     isWinning: Boolean,
+    isPrimaryUser: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val syncTimeStr = remember(score.lastSyncTimestamp) {
+        if (score.lastSyncTimestamp > 0L) {
+            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(score.lastSyncTimestamp))
+        } else ""
+    }
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isWinning) Color(0xFFF1F8E9) else MaterialTheme.colorScheme.surface
+            containerColor = if (isWinning) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         ),
+        border = if (isWinning) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -768,28 +832,79 @@ private fun UserDuelCard(
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Sync Status Pill
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = when {
+                    isPrimaryUser -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    score.isLiveSynced -> Color(0xFFE8F5E9)
+                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                }
+            ) {
+                Text(
+                    text = when {
+                        isPrimaryUser -> "📱 This Device"
+                        score.isLiveSynced && syncTimeStr.isNotBlank() -> "🟢 Synced $syncTimeStr"
+                        score.isLiveSynced -> "🟢 Synced"
+                        else -> "⚪ Not Synced"
+                    },
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = when {
+                        isPrimaryUser -> MaterialTheme.colorScheme.onPrimaryContainer
+                        score.isLiveSynced -> Color(0xFF2E7D32)
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Score Badge
-            Text(
-                text = "${score.adherencePercent}%",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                color = if (score.adherencePercent >= 85) Color(0xFF2E7D32) else Color(0xFFE65100)
-            )
-            Text(
-                text = "Adherence Score",
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (isPrimaryUser || score.isLiveSynced) {
+                Text(
+                    text = "${score.adherencePercent}%",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (score.adherencePercent >= 85) Color(0xFF2E7D32) else Color(0xFFE65100)
+                )
+                Text(
+                    text = "Adherence Score",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "—",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = "Waiting for Sync",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Stats items
-            DuelMetricRow("Calories", "${score.caloriesConsumed} / ${score.calorieBudget}")
-            DuelMetricRow("Water", "${score.waterIntakeMl} / ${score.waterTargetMl} ml")
-            DuelMetricRow("Weight", "${score.currentWeightKg} kg")
-            DuelMetricRow("Lost", "-${score.weightLostKg} kg")
+            DuelMetricRow("Calories", if (isPrimaryUser || score.isLiveSynced) "${score.caloriesConsumed} / ${score.calorieBudget}" else "—")
+            if (score.proteinTargetG > 0f) {
+                DuelMetricRow("Protein", if (isPrimaryUser || score.isLiveSynced) "${score.proteinConsumedG.toInt()} / ${score.proteinTargetG.toInt()}g" else "—")
+            }
+            DuelMetricRow("Water", if (isPrimaryUser || score.isLiveSynced) "${score.waterIntakeMl} / ${score.waterTargetMl} ml" else "—")
+            if (score.currentWeightKg > 0f) {
+                DuelMetricRow("Weight", "${score.currentWeightKg} kg")
+            }
+            if (score.weightLostKg > 0f) {
+                DuelMetricRow("Lost", "-${score.weightLostKg} kg")
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -830,6 +945,6 @@ private fun DuelMetricRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = value, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(text = value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     }
 }

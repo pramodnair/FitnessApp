@@ -12,37 +12,37 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Female
 import androidx.compose.material.icons.filled.Male
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.fitnessapp.R
 import com.example.fitnessapp.data.model.Gender
 import com.example.fitnessapp.data.model.UserProfile
-
-import androidx.compose.ui.res.painterResource
-import com.example.fitnessapp.R
 
 @Composable
 fun ProfileSwitcherHeader(
     activeProfile: UserProfile,
-    partnerProfile: UserProfile,
-    onSwitchUser: (String) -> Unit,
+    partnerName: String = "Partner",
+    isPartnerSynced: Boolean = false,
+    onNavigateToPartner: () -> Unit = {},
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -93,32 +93,61 @@ fun ProfileSwitcherHeader(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Profile Switcher Pill Row
+        // User Identity Chip + Partner Sync Status Pill Row
         Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // User identity chip
             Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.clip(RoundedCornerShape(24.dp))
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.clip(RoundedCornerShape(20.dp))
             ) {
                 Row(
-                    modifier = Modifier.padding(4.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    UserPillItem(
-                        name = activeProfile.name.ifBlank { "You" },
-                        gender = activeProfile.gender,
-                        isSelected = activeProfile.id == "primary",
-                        onClick = { onSwitchUser("primary") }
+                    Icon(
+                        imageVector = if (activeProfile.gender == Gender.MALE) Icons.Default.Male else Icons.Default.Female,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.height(16.dp).width(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    UserPillItem(
-                        name = partnerProfile.name.ifBlank { "Partner" },
-                        gender = partnerProfile.gender,
-                        isSelected = activeProfile.id == "partner",
-                        onClick = { onSwitchUser("partner") }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = activeProfile.name.ifBlank { "You" },
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            // Partner Sync Status Pill (Clickable -> opens Wi-Fi Sync tab)
+            Surface(
+                onClick = onNavigateToPartner,
+                shape = RoundedCornerShape(20.dp),
+                color = if (isPartnerSynced) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isPartnerSynced) Icons.Default.Wifi else Icons.Default.WifiOff,
+                        contentDescription = "Partner Wi-Fi Sync",
+                        tint = if (isPartnerSynced) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.height(15.dp).width(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isPartnerSynced) "Synced with $partnerName" else "Wi-Fi Sync",
+                        color = if (isPartnerSynced) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isPartnerSynced) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp
                     )
                 }
             }
@@ -126,44 +155,21 @@ fun ProfileSwitcherHeader(
     }
 }
 
+// Backwards-compatible overload
 @Composable
-private fun UserPillItem(
-    name: String,
-    gender: Gender,
-    isSelected: Boolean,
-    onClick: () -> Unit
+fun ProfileSwitcherHeader(
+    activeProfile: UserProfile,
+    partnerProfile: UserProfile,
+    onSwitchUser: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val bgColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-        label = "pill_bg"
+    ProfileSwitcherHeader(
+        activeProfile = activeProfile,
+        partnerName = partnerProfile.name.ifBlank { "Partner" },
+        isPartnerSynced = false,
+        onNavigateToPartner = {},
+        onOpenSettings = onOpenSettings,
+        modifier = modifier
     )
-    val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "pill_text"
-    )
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (gender == Gender.MALE) Icons.Default.Male else Icons.Default.Female,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.height(16.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = name,
-                color = contentColor,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 13.sp
-            )
-        }
-    }
 }

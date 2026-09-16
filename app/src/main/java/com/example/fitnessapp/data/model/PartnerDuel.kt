@@ -12,7 +12,17 @@ data class UserDailyScore(
     val waterTargetMl: Int,
     val currentWeightKg: Float,
     val weightLostKg: Float,
-    val streakDays: Int
+    val streakDays: Int,
+    val proteinConsumedG: Float = 0f,
+    val proteinTargetG: Float = 0f,
+    val carbsConsumedG: Float = 0f,
+    val carbsTargetG: Float = 0f,
+    val fatConsumedG: Float = 0f,
+    val fatTargetG: Float = 0f,
+    val targetWeightKg: Float = 0f,
+    val startWeightKg: Float = 0f,
+    val isLiveSynced: Boolean = false,
+    val lastSyncTimestamp: Long = 0L
 ) {
     // Adherence score: 100 if within budget, penalties if over budget
     val adherencePercent: Int
@@ -32,7 +42,8 @@ data class UserDailyScore(
 data class PartnerDuelSummary(
     val primaryUser: UserDailyScore,
     val partnerUser: UserDailyScore,
-    val date: String
+    val date: String,
+    val isPartnerSynced: Boolean = false
 ) {
     val winnerName: String?
         get() = when {

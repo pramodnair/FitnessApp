@@ -102,7 +102,16 @@ class AppFitnessRepository(
     private val _pairCode = MutableStateFlow(prefs.getString("partner_pair_code", "FIT-8842") ?: "FIT-8842")
     override val pairCode: StateFlow<String> = _pairCode.asStateFlow()
 
-    private val _syncedPartnerScore = MutableStateFlow<UserDailyScore?>(null)
+    private fun loadSyncedPartnerScore(): UserDailyScore? {
+        val raw = prefs.getString("synced_partner_score", null) ?: return null
+        return try {
+            json.decodeFromString<UserDailyScore>(raw)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private val _syncedPartnerScore = MutableStateFlow<UserDailyScore?>(loadSyncedPartnerScore())
     private val _incomingCheer = MutableStateFlow<String?>(null)
     override val incomingCheer: StateFlow<String?> = _incomingCheer.asStateFlow()
 
@@ -392,59 +401,43 @@ class AppFitnessRepository(
 
     private fun createDuelSummary(): PartnerDuelSummary {
         val today = getTodayDate()
-        val p1 = _primaryProfile.value
-        val p2 = _partnerProfile.value
-
-        val p1Rec = NutritionEngine.calculateRecommendations(p1)
-        val p2Rec = NutritionEngine.calculateRecommendations(p2)
-
-        val p1Meals = _meals.value.filter { it.userId == p1.id && it.date == today }
-        val p2Meals = _meals.value.filter { it.userId == p2.id && it.date == today }
-
-        val p1Cals = p1Meals.sumOf { it.calories }
-        val p2Cals = p2Meals.sumOf { it.calories }
-
-        val p1Water = _todayWaterMap.value[p1.id] ?: 0
-        val p2Water = _todayWaterMap.value[p2.id] ?: 0
-
-        val p1InitialWeight = 85f
-        val p2InitialWeight = 65f
-
-        val user1Score = UserDailyScore(
-            userId = p1.id,
-            userName = p1.name,
-            calorieBudget = p1Rec.dailyCalorieBudget,
-            caloriesConsumed = p1Cals,
-            waterIntakeMl = p1Water,
-            waterTargetMl = p1Rec.dailyWaterMl,
-            currentWeightKg = p1.currentWeightKg,
-            weightLostKg = (p1InitialWeight - p1.currentWeightKg).coerceAtLeast(0f),
-            streakDays = 5
-        )
-
-        val user2Score = UserDailyScore(
-            userId = p2.id,
-            userName = p2.name,
-            calorieBudget = p2Rec.dailyCalorieBudget,
-            caloriesConsumed = p2Cals,
-            waterIntakeMl = p2Water,
-            waterTargetMl = p2Rec.dailyWaterMl,
-            currentWeightKg = p2.currentWeightKg,
-            weightLostKg = (p2InitialWeight - p2.currentWeightKg).coerceAtLeast(0f),
-            streakDays = 4
-        )
+        val user1Score = getCurrentUserDailyScore()
 
         val syncedScore = _syncedPartnerScore.value
-        val partnerScore = if (syncedScore != null) {
-            syncedScore
-        } else {
-            user2Score
+        val isSynced = syncedScore != null
+
+        val partnerScore = syncedScore ?: run {
+            val p2 = _partnerProfile.value
+            val p2Rec = NutritionEngine.calculateRecommendations(p2)
+            val p2InitialWeight = if (p2.startWeightKg > 0f) p2.startWeightKg else p2.currentWeightKg
+            UserDailyScore(
+                userId = p2.id,
+                userName = p2.name.ifBlank { "Partner" },
+                calorieBudget = p2Rec.dailyCalorieBudget,
+                caloriesConsumed = 0,
+                waterIntakeMl = 0,
+                waterTargetMl = p2Rec.dailyWaterMl,
+                currentWeightKg = p2.currentWeightKg,
+                weightLostKg = (p2InitialWeight - p2.currentWeightKg).coerceAtLeast(0f),
+                streakDays = 0,
+                proteinConsumedG = 0f,
+                proteinTargetG = p2Rec.proteinGrams,
+                carbsConsumedG = 0f,
+                carbsTargetG = p2Rec.carbsGrams,
+                fatConsumedG = 0f,
+                fatTargetG = p2Rec.fatGrams,
+                targetWeightKg = p2.targetWeightKg,
+                startWeightKg = p2InitialWeight,
+                isLiveSynced = false,
+                lastSyncTimestamp = 0L
+            )
         }
 
         return PartnerDuelSummary(
             primaryUser = user1Score,
             partnerUser = partnerScore,
-            date = today
+            date = today,
+            isPartnerSynced = isSynced
         )
     }
 
@@ -455,7 +448,16 @@ class AppFitnessRepository(
     }
 
     override fun updateSyncedPartnerScore(score: UserDailyScore) {
-        _syncedPartnerScore.value = score
+        val updated = score.copy(
+            isLiveSynced = true,
+            lastSyncTimestamp = if (score.lastSyncTimestamp > 0L) score.lastSyncTimestamp else System.currentTimeMillis()
+        )
+        _syncedPartnerScore.value = updated
+        try {
+            prefs.edit().putString("synced_partner_score", json.encodeToString(updated)).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
         recalculateToday()
     }
 
@@ -465,7 +467,11 @@ class AppFitnessRepository(
         val rec = NutritionEngine.calculateRecommendations(currentProfile)
         val userMeals = _meals.value.filter { it.userId == currentProfile.id && it.date == today }
         val userWater = _todayWaterMap.value[currentProfile.id] ?: 0
-        val initialWeight = if (currentProfile.id == "primary") 85f else 65f
+        val initialWeight = if (currentProfile.startWeightKg > 0f) currentProfile.startWeightKg else currentProfile.currentWeightKg
+
+        val totalProtein = userMeals.sumOf { it.proteinG.toDouble() }.toFloat()
+        val totalCarbs = userMeals.sumOf { it.carbsG.toDouble() }.toFloat()
+        val totalFat = userMeals.sumOf { it.fatG.toDouble() }.toFloat()
 
         return UserDailyScore(
             userId = currentProfile.id,
@@ -476,7 +482,17 @@ class AppFitnessRepository(
             waterTargetMl = rec.dailyWaterMl,
             currentWeightKg = currentProfile.currentWeightKg,
             weightLostKg = (initialWeight - currentProfile.currentWeightKg).coerceAtLeast(0f),
-            streakDays = 5
+            streakDays = 5,
+            proteinConsumedG = totalProtein,
+            proteinTargetG = rec.proteinGrams,
+            carbsConsumedG = totalCarbs,
+            carbsTargetG = rec.carbsGrams,
+            fatConsumedG = totalFat,
+            fatTargetG = rec.fatGrams,
+            targetWeightKg = currentProfile.targetWeightKg,
+            startWeightKg = initialWeight,
+            isLiveSynced = true,
+            lastSyncTimestamp = System.currentTimeMillis()
         )
     }
 
