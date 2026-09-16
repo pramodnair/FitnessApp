@@ -69,12 +69,11 @@ class GeminiVisionService(
 
     companion object {
         val CANDIDATE_MODELS = listOf(
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
             "gemini-1.5-flash",
             "gemini-1.5-flash-8b",
-            "gemini-2.5-flash",
-            "gemini-3.8-flash",
-            "gemini-3.5-flash",
-            "gemini-3.1-flash-lite"
+            "gemini-2.5-flash"
         )
         private const val CACHE_TTL_MS = 15 * 60 * 1000L // 15 minutes TTL
         private const val DHASH_THRESHOLD = 6 // Max 6 bits difference out of 64 (~90% visual match)
@@ -134,10 +133,11 @@ class GeminiVisionService(
 
                 // Match against candidate models in priority order
                 val matched = CANDIDATE_MODELS.firstOrNull { it in modelNames }
+                    ?: modelNames.firstOrNull { it.contains("3.5-flash") }
+                    ?: modelNames.firstOrNull { it.contains("3.8-flash") }
                     ?: modelNames.firstOrNull { it.contains("1.5-flash") }
-                    ?: modelNames.firstOrNull { it.contains("2.5-flash") }
                     ?: modelNames.firstOrNull { it.contains("flash") }
-                    ?: "gemini-1.5-flash"
+                    ?: "gemini-3.5-flash"
 
                 activeModel = matched
                 val readable = formatModelDisplayName(matched)
@@ -311,7 +311,13 @@ class GeminiVisionService(
 
                 // Disable thinking overhead on models that support thinking (e.g. gemini-2.5-flash)
                 // so they respond instantaneously in 1-3 seconds instead of generating thousands of reasoning tokens.
-                if (model.contains("2.5") || model.contains("thinking")) {
+                // For Gemini 3.x models, constrain reasoning overhead with thinkingLevel = "MINIMAL"
+                // For Gemini 2.5 models, disable reasoning overhead with thinkingBudget = 0
+                // For Gemini 1.5 models, no thinkingConfig (unsupported)
+                if (model.contains("3.5") || model.contains("3.8") || model.contains("3.1")) {
+                    val thinkingConfig = JSONObject().put("thinkingLevel", "MINIMAL")
+                    genConfig.put("thinkingConfig", thinkingConfig)
+                } else if (model.contains("2.5")) {
                     val thinkingConfig = JSONObject().put("thinkingBudget", 0)
                     genConfig.put("thinkingConfig", thinkingConfig)
                 }
@@ -402,8 +408,12 @@ class GeminiVisionService(
                     } else if (response.code == 404) {
                         // Model not available on this API key or region; try next candidate model immediately
                         break
+                    } else if (response.code == 400) {
+                        // If a model rejects thinkingLevel or any parameter, fail forward to next model (e.g. gemini-1.5-flash)
+                        Log.w("GeminiVision", "Model $model returned HTTP 400. Falling back to next candidate model.")
+                        break
                     } else {
-                        // Unrecoverable errors like 400 (Bad Request) or 403 (Invalid Key / Blocked)
+                        // Unrecoverable errors like 401/403 (Invalid Key / Blocked)
                         val errorMsg = extractErrorMessage(responseBody, response.code)
                         Log.e("GeminiVision", "Gemini API unrecoverable error $lastStatusCode: $responseBody")
                         return@withContext getMockAnalysis(today, mealType, userId, errorMsg)
