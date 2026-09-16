@@ -123,17 +123,37 @@ class AppFitnessRepository(
     override fun switchActiveProfile(userId: String) {
         activeUserId = userId
         prefs.edit().putString("active_user_id", userId).apply()
-        _activeProfile.value = if (userId == "primary") _primaryProfile.value else _partnerProfile.value
+        val target = if (userId == "primary") _primaryProfile.value else _partnerProfile.value
+        val deviceKey = prefs.getString("device_gemini_api_key", "") ?: ""
+        _activeProfile.value = if (target.geminiApiKey.isBlank() && deviceKey.isNotBlank()) {
+            target.copy(geminiApiKey = deviceKey)
+        } else {
+            target
+        }
         recalculateToday()
     }
 
     override fun updateProfile(profile: UserProfile) {
+        val cleanKey = profile.geminiApiKey.trim()
+        if (cleanKey.isNotBlank()) {
+            prefs.edit().putString("device_gemini_api_key", cleanKey).apply()
+        }
         if (profile.id == "primary") {
             _primaryProfile.value = profile
             saveProfile("primary", profile)
+            if (_partnerProfile.value.geminiApiKey.isBlank() && cleanKey.isNotBlank()) {
+                val updatedPartner = _partnerProfile.value.copy(geminiApiKey = cleanKey)
+                _partnerProfile.value = updatedPartner
+                saveProfile("partner", updatedPartner)
+            }
         } else {
             _partnerProfile.value = profile
             saveProfile("partner", profile)
+            if (_primaryProfile.value.geminiApiKey.isBlank() && cleanKey.isNotBlank()) {
+                val updatedPrimary = _primaryProfile.value.copy(geminiApiKey = cleanKey)
+                _primaryProfile.value = updatedPrimary
+                saveProfile("primary", updatedPrimary)
+            }
         }
         if (profile.id == activeUserId) {
             _activeProfile.value = profile
@@ -315,7 +335,11 @@ class AppFitnessRepository(
     }
 
     override fun setGeminiApiKey(apiKey: String) {
-        val updated = _activeProfile.value.copy(geminiApiKey = apiKey)
+        val trimmed = apiKey.trim()
+        if (trimmed.isNotBlank()) {
+            prefs.edit().putString("device_gemini_api_key", trimmed).apply()
+        }
+        val updated = _activeProfile.value.copy(geminiApiKey = trimmed)
         updateProfile(updated)
     }
 
@@ -410,7 +434,7 @@ class AppFitnessRepository(
             streakDays = 4
         )
 
-        val syncedScore = _syncedPartnerScore?.value
+        val syncedScore = _syncedPartnerScore.value
         val partnerScore = if (syncedScore != null) {
             syncedScore
         } else {
@@ -523,16 +547,30 @@ class AppFitnessRepository(
     }
 
     private fun saveProfile(key: String, profile: UserProfile) {
+        val cleanKey = profile.geminiApiKey.trim()
+        if (cleanKey.isNotBlank()) {
+            prefs.edit().putString("device_gemini_api_key", cleanKey).apply()
+        }
         prefs.edit().putString("profile_$key", json.encodeToString(profile)).apply()
     }
 
     private fun loadProfile(key: String, default: UserProfile): UserProfile {
-        val str = prefs.getString("profile_$key", null) ?: return default
-        return try {
-            val p: UserProfile = json.decodeFromString(str)
-            if (p.startWeightKg <= 0f) p.copy(startWeightKg = p.currentWeightKg) else p
-        } catch (e: Exception) {
+        val deviceKey = prefs.getString("device_gemini_api_key", "") ?: ""
+        val str = prefs.getString("profile_$key", null)
+        val loaded = if (str != null) {
+            try {
+                val p: UserProfile = json.decodeFromString(str)
+                if (p.startWeightKg <= 0f) p.copy(startWeightKg = p.currentWeightKg) else p
+            } catch (e: Exception) {
+                default
+            }
+        } else {
             default
+        }
+        return if (loaded.geminiApiKey.isBlank() && deviceKey.isNotBlank()) {
+            loaded.copy(geminiApiKey = deviceKey)
+        } else {
+            loaded
         }
     }
 

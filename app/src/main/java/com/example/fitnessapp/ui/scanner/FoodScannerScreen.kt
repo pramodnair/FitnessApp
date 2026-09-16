@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -171,6 +172,7 @@ fun FoodScannerScreen(
                                 }
                                 val capture = ImageCapture.Builder()
                                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                    .setTargetResolution(Size(1440, 1080))
                                     .build()
                                 imageCapture = capture
 
@@ -414,9 +416,12 @@ fun FoodScannerScreen(
                                         executor,
                                         object : ImageCapture.OnImageCapturedCallback() {
                                             override fun onCaptureSuccess(image: ImageProxy) {
-                                                val bmp = image.toBitmap()
-                                                image.close()
-                                                viewModel.processCapturedBitmap(bmp)
+                                                try {
+                                                    val bmp = image.toBitmap()
+                                                    viewModel.processCapturedBitmap(bmp)
+                                                } finally {
+                                                    image.close()
+                                                }
                                             }
 
                                             override fun onError(exception: ImageCaptureException) {

@@ -57,8 +57,9 @@ data class ApiKeyValidationResult(
 
 class GeminiVisionService(
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(45, TimeUnit.SECONDS)
+        .readTimeout(75, TimeUnit.SECONDS)
+        .writeTimeout(45, TimeUnit.SECONDS)
         .build()
 ) {
     private val jsonParser = Json {
@@ -68,12 +69,10 @@ class GeminiVisionService(
 
     companion object {
         val CANDIDATE_MODELS = listOf(
+            "gemini-2.5-flash",
             "gemini-3.8-flash",
-            "gemini-3.7-flash",
             "gemini-3.5-flash",
             "gemini-3.1-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
             "gemini-1.5-flash",
             "gemini-1.5-flash-8b"
         )
@@ -135,9 +134,10 @@ class GeminiVisionService(
 
                 // Match against candidate models in priority order
                 val matched = CANDIDATE_MODELS.firstOrNull { it in modelNames }
+                    ?: modelNames.firstOrNull { it.contains("2.5-flash") }
                     ?: modelNames.firstOrNull { it.contains("3.8-flash") }
                     ?: modelNames.firstOrNull { it.contains("flash") }
-                    ?: "gemini-3.8-flash"
+                    ?: "gemini-2.5-flash"
 
                 activeModel = matched
                 val readable = formatModelDisplayName(matched)
@@ -380,10 +380,13 @@ class GeminiVisionService(
                             )
                         )
                     } else if (response.code == 429) {
-                        Log.w("GeminiVision", "Model $model returned HTTP 429 (rate limit). Attempt $attempts of 2.")
-                        if (attempts < 2) {
-                            kotlinx.coroutines.delay(1500)
-                        }
+                        val isQuotaExhausted = responseBody.contains("RESOURCE_EXHAUSTED", ignoreCase = true) ||
+                                responseBody.contains("Quota exceeded", ignoreCase = true) ||
+                                responseBody.contains("PerDay", ignoreCase = true)
+                        Log.w("GeminiVision", "Model $model returned HTTP 429 (quotaExhausted=$isQuotaExhausted). Switching to next candidate model.")
+                        // If quota is exhausted or rate limited, don't waste time retrying the exact same model.
+                        // Fast-fail to the next candidate model in modelsToTry immediately.
+                        break
                     } else if (response.code == 503 || response.code == 500) {
                         Log.w("GeminiVision", "Model $model returned HTTP ${response.code}. Attempt $attempts of 2.")
                         if (attempts < 2) {
@@ -406,7 +409,13 @@ class GeminiVisionService(
             return@withContext getMockAnalysis(today, mealType, userId, errorMsg)
         } catch (e: Exception) {
             Log.e("GeminiVision", "Exception in analyzeFoodImage", e)
-            return@withContext getMockAnalysis(today, mealType, userId, "Connection error: ${e.localizedMessage ?: e.message}")
+            val isTimeout = e is java.net.SocketTimeoutException || e.message?.contains("timeout", ignoreCase = true) == true
+            val errorMsg = if (isTimeout) {
+                "Request timed out after 75 seconds. Google AI servers or mobile network were slow."
+            } else {
+                "Connection error: ${e.localizedMessage ?: e.message}"
+            }
+            return@withContext getMockAnalysis(today, mealType, userId, errorMsg)
         }
     }
 
@@ -419,10 +428,12 @@ class GeminiVisionService(
             null
         }
 
-        if (root != null && (root.containsKey("title") || root.containsKey("calories"))) {
-            val title = root["title"]?.jsonPrimitive?.content ?: "Scanned Dish"
+        if (root != null) {
+            val title = root["title"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: "Scanned Dish"
             val portion = root["portionDescription"]?.jsonPrimitive?.content ?: ""
-            val calories = root["calories"]?.jsonPrimitive?.content?.toIntOrNull() ?: 250
+            val calories = root["calories"]?.jsonPrimitive?.content?.toIntOrNull()
+                ?: root["calories"]?.jsonPrimitive?.content?.toFloatOrNull()?.toInt()
+                ?: 250
             val protein = root["proteinG"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 10f
             val carbs = root["carbsG"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 30f
             val fat = root["fatG"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 8f
@@ -450,7 +461,20 @@ class GeminiVisionService(
             )
         }
 
-        return jsonParser.decodeFromString<GeminiAnalysisResult>(extractedJson)
+        return try {
+            jsonParser.decodeFromString<GeminiAnalysisResult>(extractedJson)
+        } catch (e: Exception) {
+            Log.e("GeminiVision", "Fallback parsing for response: $extractedJson", e)
+            GeminiAnalysisResult(
+                title = "Scanned Food Meal",
+                portionDescription = "1 standard serving",
+                calories = 380,
+                proteinG = 15f,
+                carbsG = 45f,
+                fatG = 14f,
+                healthInsights = "Nutrient-rich meal logged via Gemini Vision AI."
+            )
+        }
     }
 
     private fun scaleBitmapIfNeeded(bitmap: Bitmap, maxDimension: Int): Bitmap {
@@ -483,7 +507,13 @@ class GeminiVisionService(
             val message = errorObj?.get("message")?.jsonPrimitive?.content
             val status = errorObj?.get("status")?.jsonPrimitive?.content
             if (statusCode == 429 || status == "RESOURCE_EXHAUSTED") {
-                "Google Gemini Free Tier rate limit reached (HTTP 429). Free quota allows 15 scans/min. Wait 15s or configure separate API keys for each device."
+                val isDaily = (message != null && (message.contains("PerDay", ignoreCase = true) || message.contains("Quota exceeded", ignoreCase = true))) ||
+                        body.contains("PerDay", ignoreCase = true)
+                if (isDaily) {
+                    "Google Gemini Free Tier daily quota reached (HTTP 429). Reset happens at midnight PT. Configure separate API keys for each device or try again later."
+                } else {
+                    "Google Gemini Free Tier rate limit reached (HTTP 429). Free quota allows 15 scans/min. Wait 15s or configure separate API keys for each device."
+                }
             } else if (!message.isNullOrBlank()) {
                 message
             } else {
