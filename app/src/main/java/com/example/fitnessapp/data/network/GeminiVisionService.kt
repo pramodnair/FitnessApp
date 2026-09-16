@@ -69,12 +69,12 @@ class GeminiVisionService(
 
     companion object {
         val CANDIDATE_MODELS = listOf(
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
             "gemini-2.5-flash",
             "gemini-3.8-flash",
             "gemini-3.5-flash",
-            "gemini-3.1-flash-lite",
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-8b"
+            "gemini-3.1-flash-lite"
         )
         private const val CACHE_TTL_MS = 15 * 60 * 1000L // 15 minutes TTL
         private const val DHASH_THRESHOLD = 6 // Max 6 bits difference out of 64 (~90% visual match)
@@ -134,10 +134,10 @@ class GeminiVisionService(
 
                 // Match against candidate models in priority order
                 val matched = CANDIDATE_MODELS.firstOrNull { it in modelNames }
+                    ?: modelNames.firstOrNull { it.contains("1.5-flash") }
                     ?: modelNames.firstOrNull { it.contains("2.5-flash") }
-                    ?: modelNames.firstOrNull { it.contains("3.8-flash") }
                     ?: modelNames.firstOrNull { it.contains("flash") }
-                    ?: "gemini-2.5-flash"
+                    ?: "gemini-1.5-flash"
 
                 activeModel = matched
                 val readable = formatModelDisplayName(matched)
@@ -285,10 +285,6 @@ class GeminiVisionService(
             val contentObj = JSONObject().put("parts", parts)
             val contents = JSONArray().put(contentObj)
 
-            val genConfig = JSONObject()
-                .put("temperature", 0.2)
-                .put("responseMimeType", "application/json")
-
             val safetySettings = JSONArray().apply {
                 val categories = listOf(
                     "HARM_CATEGORY_HARASSMENT",
@@ -304,18 +300,29 @@ class GeminiVisionService(
                 }
             }
 
-            val requestJsonObj = JSONObject()
-                .put("contents", contents)
-                .put("generationConfig", genConfig)
-                .put("safetySettings", safetySettings)
-
-            val requestJson = requestJsonObj.toString()
-
             val modelsToTry = (listOfNotNull(activeModel) + CANDIDATE_MODELS).distinct()
             var lastResponseBody = ""
             var lastStatusCode = 0
 
             for (model in modelsToTry) {
+                val genConfig = JSONObject()
+                    .put("temperature", 0.2)
+                    .put("responseMimeType", "application/json")
+
+                // Disable thinking overhead on models that support thinking (e.g. gemini-2.5-flash)
+                // so they respond instantaneously in 1-3 seconds instead of generating thousands of reasoning tokens.
+                if (model.contains("2.5") || model.contains("thinking")) {
+                    val thinkingConfig = JSONObject().put("thinkingBudget", 0)
+                    genConfig.put("thinkingConfig", thinkingConfig)
+                }
+
+                val requestJsonObj = JSONObject()
+                    .put("contents", contents)
+                    .put("generationConfig", genConfig)
+                    .put("safetySettings", safetySettings)
+
+                val requestJson = requestJsonObj.toString()
+
                 var attempts = 0
                 while (attempts < 2) {
                     attempts++
