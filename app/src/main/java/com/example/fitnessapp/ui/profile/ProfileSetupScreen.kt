@@ -1,0 +1,543 @@
+package com.example.fitnessapp.ui.profile
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.fitnessapp.data.model.ActivityLevel
+import com.example.fitnessapp.data.model.DeficitLevel
+import com.example.fitnessapp.data.model.Gender
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileSetupScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToOnboarding: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    viewModel: ProfileSetupViewModel = viewModel()
+) {
+    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    var name by remember(profile) { mutableStateOf(profile.name) }
+    var gender by remember(profile) { mutableStateOf(profile.gender) }
+    var ageText by remember(profile) { mutableStateOf(profile.age.toString()) }
+    var heightText by remember(profile) { mutableStateOf(profile.heightCm.toInt().toString()) }
+    var currentWeightText by remember(profile) { mutableStateOf(profile.currentWeightKg.toString()) }
+    var startWeightText by remember(profile) { mutableStateOf(profile.startWeightKg.toString()) }
+    var targetWeightText by remember(profile) { mutableStateOf(profile.targetWeightKg.toString()) }
+    var activityLevel by remember(profile) { mutableStateOf(profile.activityLevel) }
+    var deficitLevel by remember(profile) { mutableStateOf(profile.deficitLevel) }
+    var customDeficitText by remember(profile) { mutableStateOf(profile.customDeficitKcal.toString()) }
+    var apiKey by remember(profile) { mutableStateOf(profile.geminiApiKey) }
+    var selectedTargetBmi by remember(profile) { mutableStateOf(profile.targetBmi) }
+    var autoCalculateTarget by remember(profile) { mutableStateOf(profile.autoCalculateTargetFromBmi) }
+
+    // API Key test state
+    var isTestingApiKey by remember { mutableStateOf(false) }
+    var apiKeyTestResult by remember { mutableStateOf<String?>(null) }
+    var apiKeyTestSuccess by remember { mutableStateOf<Boolean?>(null) }
+
+    val currentHeight = heightText.toFloatOrNull() ?: profile.heightCm
+    val idealRange = com.example.fitnessapp.domain.BmiCalculator.getIdealWeightRange(currentHeight)
+    val currentEnteredTargetWeight = targetWeightText.toFloatOrNull() ?: profile.targetWeightKg
+    val resultingTargetBmi = com.example.fitnessapp.domain.BmiCalculator.calculateBmi(currentEnteredTargetWeight, currentHeight)
+    val resultingCategory = com.example.fitnessapp.domain.BmiCalculator.getCategory(resultingTargetBmi)
+
+    fun applyTargetBmi(bmi: Float) {
+        selectedTargetBmi = bmi
+        if (currentHeight > 50f) {
+            val calcWeight = com.example.fitnessapp.domain.BmiCalculator.getWeightForBmi(bmi, currentHeight)
+            targetWeightText = calcWeight.toString()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Profile & Calorie Deficit Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        modifier = modifier.fillMaxSize()
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Bio Info Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Personal Physical Attributes", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Gender chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Gender.entries.forEach { g ->
+                            FilterChip(
+                                selected = gender == g,
+                                onClick = { gender = g },
+                                label = { Text(if (g == Gender.MALE) "Male 👨" else "Female 👩") }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = ageText,
+                            onValueChange = { ageText = it },
+                            label = { Text("Age (yrs)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = heightText,
+                            onValueChange = {
+                                heightText = it
+                                val h = it.toFloatOrNull() ?: 0f
+                                if (autoCalculateTarget && h > 50f) {
+                                    val calc = com.example.fitnessapp.domain.BmiCalculator.getWeightForBmi(selectedTargetBmi, h)
+                                    targetWeightText = calc.toString()
+                                }
+                            },
+                            label = { Text("Height (cm)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = startWeightText,
+                            onValueChange = { startWeightText = it },
+                            label = { Text("Starting Weight (kg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = currentWeightText,
+                            onValueChange = { currentWeightText = it },
+                            label = { Text("Current Weight (kg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Target Weight & BMI Calculation Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Target Weight & BMI", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Auto-calculate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Switch(
+                                checked = autoCalculateTarget,
+                                onCheckedChange = { checked ->
+                                    autoCalculateTarget = checked
+                                    if (checked && currentHeight > 50f) {
+                                        applyTargetBmi(selectedTargetBmi)
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Healthy weight range for ${currentHeight.toInt()}cm: ${idealRange.first} - ${idealRange.second} kg (BMI 18.5 - 24.9)",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Target BMI Preset Chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = (selectedTargetBmi == 21.0f),
+                            onClick = {
+                                autoCalculateTarget = true
+                                applyTargetBmi(21.0f)
+                            },
+                            label = { Text("Lean 21.0", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = (selectedTargetBmi == 22.0f),
+                            onClick = {
+                                autoCalculateTarget = true
+                                applyTargetBmi(22.0f)
+                            },
+                            label = { Text("⭐ Optimal 22.0", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = (selectedTargetBmi == 23.5f),
+                            onClick = {
+                                autoCalculateTarget = true
+                                applyTargetBmi(23.5f)
+                            },
+                            label = { Text("Fit 23.5", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = targetWeightText,
+                        onValueChange = {
+                            targetWeightText = it
+                            autoCalculateTarget = false
+                        },
+                        label = { Text("Target Goal Weight (kg)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Target Result Indicator
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Target: $targetWeightText kg  ➔  BMI: $resultingTargetBmi (${resultingCategory.label})",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(resultingCategory.colorHex)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Calorie Deficit Customization Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Customizable Calorie Deficit", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Choose your fat loss pace. Mifflin-St Jeor equation automatically calculates your daily budget.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    DeficitLevel.entries.forEach { level ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        ) {
+                            FilterChip(
+                                selected = deficitLevel == level,
+                                onClick = { deficitLevel = level },
+                                label = { Text(level.label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    if (deficitLevel == DeficitLevel.CUSTOM) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = customDeficitText,
+                            onValueChange = { customDeficitText = it },
+                            label = { Text("Custom Deficit (kcal/day)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Google Gemini Vision API Key Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Google Gemini Vision API Key", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Used for AI food meal recognition powered by Gemini 3.8 Flash (with automatic fallback to Gemini 3.5 & 2.0). Free key available at aistudio.google.com. Tip: For multi-device or couples sharing, each person using their own free key avoids rate limits.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = {
+                            apiKey = it
+                            apiKeyTestResult = null
+                            apiKeyTestSuccess = null
+                        },
+                        label = { Text("Gemini API Key") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (apiKey.isBlank()) {
+                                    apiKeyTestSuccess = false
+                                    apiKeyTestResult = "Please paste an API key first."
+                                    return@OutlinedButton
+                                }
+                                scope.launch {
+                                    isTestingApiKey = true
+                                    apiKeyTestResult = null
+                                    val res = viewModel.testApiKey(apiKey)
+                                    isTestingApiKey = false
+                                    apiKeyTestSuccess = res.isValid
+                                    apiKeyTestResult = res.message
+                                }
+                            },
+                            enabled = !isTestingApiKey
+                        ) {
+                            if (isTestingApiKey) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Connecting...", fontSize = 12.sp)
+                            } else {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Verify API Key", fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    // Test Feedback Banner
+                    apiKeyTestResult?.let { msg ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val isSuccess = apiKeyTestSuccess == true
+                        val bannerColor = if (isSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                        val textColor = if (isSuccess) Color(0xFF2E7D32) else Color(0xFFC62828)
+                        val icon = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.ErrorOutline
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = bannerColor),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = msg,
+                                    color = textColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Save Button
+            Button(
+                onClick = {
+                    val updated = profile.copy(
+                        name = name,
+                        gender = gender,
+                        age = ageText.toIntOrNull() ?: profile.age,
+                        heightCm = heightText.toFloatOrNull() ?: profile.heightCm,
+                        startWeightKg = startWeightText.toFloatOrNull() ?: profile.startWeightKg,
+                        currentWeightKg = currentWeightText.toFloatOrNull() ?: profile.currentWeightKg,
+                        targetWeightKg = targetWeightText.toFloatOrNull() ?: profile.targetWeightKg,
+                        targetBmi = selectedTargetBmi,
+                        autoCalculateTargetFromBmi = autoCalculateTarget,
+                        activityLevel = activityLevel,
+                        deficitLevel = deficitLevel,
+                        customDeficitKcal = customDeficitText.toIntOrNull() ?: profile.customDeficitKcal,
+                        geminiApiKey = apiKey.trim()
+                    )
+                    viewModel.saveProfile(updated)
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Profile & targets saved successfully!")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save Profile & Recalculate Targets", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToOnboarding,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Revisit Welcome & Permissions Tour")
+            }
+
+            Spacer(modifier = Modifier.height(60.dp))
+        }
+    }
+}

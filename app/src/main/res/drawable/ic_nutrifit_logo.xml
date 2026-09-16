@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    
+    <!-- Outer Calorie Budget Tracker Ring -->
+    <path
+        android:pathData="M24,4 A20,20 0 1,1 5,30.8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeColor="#10B981" />
+        
+    <path
+        android:pathData="M5,30.8 A20,20 0 0,1 15.5,5.1"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeColor="#F59E0B" />
+
+    <!-- Nutrition Leaf (Left) -->
+    <path
+        android:pathData="M24,24 C18.3,14 11.9,15.4 11.2,24 C10.5,30.4 18.3,33.3 24,24 Z"
+        android:fillColor="#10B981" />
+
+    <!-- Fitness Vitality Flame (Center & Right) -->
+    <path
+        android:pathData="M24,9.7 C26.9,15.4 32.6,17.6 32.6,24 C32.6,29 28.3,33.3 24,33.3 C19.7,33.3 16.9,29 18.3,24.7 C19.7,28.3 22.6,29.7 24.7,28.3 C26.9,26.9 27.6,23.3 26.1,19.7 C24.7,16.1 24,12.6 24,9.7 Z"
+        android:fillColor="#F97316" />
+        
+    <!-- Inner Flame Core -->
+    <path
+        android:pathData="M24,20.4 C25.4,23.3 28.3,24.7 28.3,27.6 C28.3,30.4 26.1,31.9 24,31.9 C21.9,31.9 20.4,29.7 21.1,27.6 C21.9,26.1 23.3,23.3 24,20.4 Z"
+        android:fillColor="#FDE047" />
+
+    <!-- AI Sparkle Star -->
+    <path
+        android:pathData="M35.4,8.3 L36.5,10.8 L39,11.8 L36.5,12.9 L35.4,15.4 L34.4,12.9 L31.9,11.8 L34.4,10.8 Z"
+        android:fillColor="#38BDF8" />
+
+</vector>
