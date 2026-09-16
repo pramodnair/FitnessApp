@@ -22,7 +22,7 @@ NutriFit AI is built with modern Android architectural best practices following 
 
 ```mermaid
 graph TD
-    subgraph UI Layer ["UI Layer (Jetpack Compose & Material 3)"]
+    subgraph UILayer ["UI Layer (Jetpack Compose & Material 3)"]
         Nav["Navigation Host"]
         Dashboard["Main / Dashboard"]
         Scanner["CameraX Food Scanner & Review Dialog"]
@@ -31,17 +31,17 @@ graph TD
         Gallery["Private Transformation Gallery"]
     end
 
-    subgraph Domain Layer ["Domain Layer (Business Logic & Calculations)"]
+    subgraph DomainLayer ["Domain Layer (Business Logic & Calculations)"]
         NutrEngine["NutritionEngine (Mifflin-St Jeor TDEE)"]
         BmiCalc["BmiCalculator (WHO & Asian Classifications)"]
     end
 
-    subgraph Data Layer ["Data Layer (Repository & Persistence)"]
+    subgraph DataLayer ["Data Layer (Repository & Persistence)"]
         Repo["FitnessRepositoryImpl"]
         SharedPrefs["Encrypted / SharedPreferences Local Storage"]
     end
 
-    subgraph Network & Sync ["Network & Distributed Sync Engine"]
+    subgraph NetworkSync ["Network & Distributed Sync Engine"]
         GeminiService["GeminiVisionService (Dynamic Discovery & 429 Cascading)"]
         KtorServer["Embedded Ktor HTTP Server (Port 8988)"]
         KtorClient["LocalSyncClient (Raw TCP Probes & HTTP Client)"]
@@ -49,12 +49,12 @@ graph TD
         SubnetScanner["Parallel Subnet Scanner (Semaphore 25)"]
     end
 
-    UI Layer --> Domain Layer
-    UI Layer --> Data Layer
-    Data Layer --> Domain Layer
-    Data Layer --> Network & Sync
-    Network & Sync --> GoogleAI["Google Gemini API (v1beta REST)"]
-    Network & Sync <--> PeerDevice["Partner Device (Local LAN)"]
+    UILayer --> DomainLayer
+    UILayer --> DataLayer
+    DataLayer --> DomainLayer
+    DataLayer --> NetworkSync
+    NetworkSync --> GoogleAI["Google Gemini API (v1beta REST)"]
+    NetworkSync --- PeerDevice["Partner Device (Local LAN)"]
 ```
 
 ### Layer Breakdown
