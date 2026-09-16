@@ -39,6 +39,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -208,6 +212,59 @@ fun FoodScannerScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(onClick = { permissionLauncher.launch(android.Manifest.permission.CAMERA) }) {
                             Text("Grant Permission")
+                        }
+                    }
+                }
+            }
+
+            // Re-open Last Scan Floating Banner
+            val lastMeal by viewModel.lastScannedMeal.collectAsStateWithLifecycle()
+            if (lastMeal != null && uiState is ScannerUiState.Idle) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .clickable { viewModel.restoreLastScan() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xEE0F172A),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = Color(0xFF38BDF8),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Resume: ${lastMeal?.title}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "Accidentally closed? Tap here to re-open & log",
+                                fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.75f)
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearLastScan() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
                 }

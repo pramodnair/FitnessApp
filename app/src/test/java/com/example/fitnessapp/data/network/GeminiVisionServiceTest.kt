@@ -86,4 +86,14 @@ class GeminiVisionServiceTest {
         assertTrue(extracted.endsWith("}"))
         assertTrue(extracted.contains("\"title\": \"Idli Sambar\""))
     }
+
+    @Test
+    fun testComputeSha256_producesConsistentHash() {
+        val data1 = "test image data 123".toByteArray(Charsets.UTF_8)
+        val data2 = "test image data 123".toByteArray(Charsets.UTF_8)
+        val hash1 = service.computeSha256(data1)
+        val hash2 = service.computeSha256(data2)
+        assertEquals(hash1, hash2)
+        assertEquals(64, hash1.length)
+    }
 }

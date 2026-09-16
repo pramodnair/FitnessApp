@@ -42,6 +42,14 @@ data class GeminiAnalysisResult(
     val healthInsights: String = ""
 )
 
+data class CachedVisionAnalysis(
+    val result: GeminiAnalysisResult,
+    val exactSha256: String,
+    val dHash: Long,
+    val timestamp: Long,
+    val sourceModel: String
+)
+
 data class ApiKeyValidationResult(
     val isValid: Boolean,
     val message: String
@@ -69,10 +77,37 @@ class GeminiVisionService(
             "gemini-1.5-flash",
             "gemini-1.5-flash-8b"
         )
+        private const val CACHE_TTL_MS = 15 * 60 * 1000L // 15 minutes TTL
+        private const val DHASH_THRESHOLD = 6 // Max 6 bits difference out of 64 (~90% visual match)
     }
+
+    private val scanCache = java.util.concurrent.ConcurrentLinkedQueue<CachedVisionAnalysis>()
 
     @Volatile
     private var activeModel: String? = null
+
+    internal fun computeDHash(bitmap: Bitmap): Long {
+        val scaled = Bitmap.createScaledBitmap(bitmap, 9, 8, true)
+        var hash = 0L
+        for (y in 0 until 8) {
+            for (x in 0 until 8) {
+                val pixelLeft = scaled.getPixel(x, y)
+                val pixelRight = scaled.getPixel(x + 1, y)
+                val lumLeft = (android.graphics.Color.red(pixelLeft) * 299 + android.graphics.Color.green(pixelLeft) * 587 + android.graphics.Color.blue(pixelLeft) * 114) / 1000
+                val lumRight = (android.graphics.Color.red(pixelRight) * 299 + android.graphics.Color.green(pixelRight) * 587 + android.graphics.Color.blue(pixelRight) * 114) / 1000
+                if (lumLeft > lumRight) {
+                    hash = hash or (1L shl (y * 8 + x))
+                }
+            }
+        }
+        return hash
+    }
+
+    internal fun computeSha256(data: ByteArray): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(data)
+        return digest.joinToString("") { "%02x".format(it) }
+    }
 
     suspend fun validateApiKey(apiKey: String): ApiKeyValidationResult = withContext(Dispatchers.IO) {
         val trimmed = apiKey.trim()
@@ -156,7 +191,62 @@ class GeminiVisionService(
 
         try {
             val resized = scaleBitmapIfNeeded(bitmap, maxDimension = 1024)
-            val base64Image = bitmapToBase64(resized)
+            val outputStream = ByteArrayOutputStream()
+            resized.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+            val jpegBytes = outputStream.toByteArray()
+            val base64Image = Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
+            val exactSha256 = computeSha256(jpegBytes)
+            val dHash = computeDHash(resized)
+
+            // Check recent scan cache to prevent duplicate Gemini API requests & rate limits
+            val now = System.currentTimeMillis()
+            scanCache.removeIf { now - it.timestamp > CACHE_TTL_MS }
+            val cached = scanCache.firstOrNull { entry ->
+                if (entry.exactSha256 == exactSha256) return@firstOrNull true
+                val diff = java.lang.Long.bitCount(entry.dHash xor dHash)
+                diff <= DHASH_THRESHOLD
+            }
+
+            if (cached != null) {
+                Log.i("GeminiVision", "Cache HIT for dish '${cached.result.title}' (model: ${cached.sourceModel}). Reusing AI analysis instantly.")
+                return@withContext MealLog(
+                    id = UUID.randomUUID().toString(),
+                    userId = userId,
+                    date = today,
+                    timestamp = System.currentTimeMillis(),
+                    mealType = mealType,
+                    title = cached.result.title,
+                    calories = cached.result.calories,
+                    proteinG = cached.result.proteinG,
+                    carbsG = cached.result.carbsG,
+                    fatG = cached.result.fatG,
+                    micronutrients = Micronutrients(
+                        fiberG = cached.result.fiberG,
+                        sugarG = cached.result.sugarG,
+                        sodiumMg = cached.result.sodiumMg,
+                        potassiumMg = cached.result.potassiumMg
+                    ),
+                    aiInsights = cached.result.healthInsights,
+                    aiSource = "LIVE_AI",
+                    aiErrorMessage = null,
+                    items = listOf(
+                        FoodItem(
+                            name = cached.result.title,
+                            portionDescription = cached.result.portionDescription,
+                            calories = cached.result.calories,
+                            proteinG = cached.result.proteinG,
+                            carbsG = cached.result.carbsG,
+                            fatG = cached.result.fatG,
+                            micronutrients = Micronutrients(
+                                fiberG = cached.result.fiberG,
+                                sugarG = cached.result.sugarG,
+                                sodiumMg = cached.result.sodiumMg,
+                                potassiumMg = cached.result.potassiumMg
+                            )
+                        )
+                    )
+                )
+            }
             val prompt = """
                 You are a certified clinical nutritionist and dietary vision AI specializing in global and Indian cuisine.
                 Analyze this food photograph carefully.
@@ -243,6 +333,15 @@ class GeminiVisionService(
                     if (response.isSuccessful && responseBody.isNotBlank()) {
                         activeModel = model
                         val parsed = parseAnalysisResult(responseBody)
+                        scanCache.add(
+                            CachedVisionAnalysis(
+                                result = parsed,
+                                exactSha256 = exactSha256,
+                                dHash = dHash,
+                                timestamp = System.currentTimeMillis(),
+                                sourceModel = model
+                            )
+                        )
                         return@withContext MealLog(
                             id = UUID.randomUUID().toString(),
                             userId = userId,

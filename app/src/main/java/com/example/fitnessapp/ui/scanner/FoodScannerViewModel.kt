@@ -32,6 +32,9 @@ class FoodScannerViewModel(
     private val _uiState = MutableStateFlow<ScannerUiState>(ScannerUiState.Idle)
     val uiState: StateFlow<ScannerUiState> = _uiState.asStateFlow()
 
+    private val _lastScannedMeal = MutableStateFlow<MealLog?>(null)
+    val lastScannedMeal: StateFlow<MealLog?> = _lastScannedMeal.asStateFlow()
+
     val activeProfile: StateFlow<UserProfile> = repository.activeProfile
     val todaySummary: StateFlow<DailyNutritionSummary> = repository.todaySummary
 
@@ -56,6 +59,7 @@ class FoodScannerViewModel(
                     userId = profile.id
                 ).copy(photoPath = photoFile.absolutePath)
 
+                _lastScannedMeal.value = analyzedMeal
                 _uiState.value = ScannerUiState.Review(analyzedMeal)
             } catch (e: Exception) {
                 _uiState.value = ScannerUiState.Error("Analysis failed: ${e.message}")
@@ -63,8 +67,19 @@ class FoodScannerViewModel(
         }
     }
 
+    fun restoreLastScan() {
+        _lastScannedMeal.value?.let {
+            _uiState.value = ScannerUiState.Review(it)
+        }
+    }
+
+    fun clearLastScan() {
+        _lastScannedMeal.value = null
+    }
+
     fun confirmMeal(meal: MealLog) {
         repository.addMeal(meal)
+        _lastScannedMeal.value = null
         _uiState.value = ScannerUiState.Idle
     }
 
