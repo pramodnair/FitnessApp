@@ -384,7 +384,25 @@ class FoodNutritionSearchService(
             val content = firstCandidate.optJSONObject("content") ?: return ""
             val parts = content.optJSONArray("parts") ?: return ""
             if (parts.length() == 0) return ""
-            parts.getJSONObject(0).optString("text", "")
+
+            val textBuilder = StringBuilder()
+            for (i in 0 until parts.length()) {
+                val part = parts.getJSONObject(i)
+                val isThought = part.optBoolean("thought", false)
+                if (!isThought) {
+                    val t = part.optString("text", "")
+                    if (t.isNotBlank()) textBuilder.append(t)
+                }
+            }
+
+            if (textBuilder.isEmpty()) {
+                for (i in (parts.length() - 1) downTo 0) {
+                    val t = parts.getJSONObject(i).optString("text", "")
+                    if (t.isNotBlank()) return t
+                }
+            }
+
+            textBuilder.toString()
         } catch (e: Exception) {
             ""
         }

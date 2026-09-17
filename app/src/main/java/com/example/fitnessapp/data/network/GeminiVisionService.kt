@@ -69,11 +69,9 @@ class GeminiVisionService(
 
     companion object {
         val CANDIDATE_MODELS = listOf(
-            "gemini-3.5-flash",
-            "gemini-3.8-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-8b",
-            "gemini-2.5-flash"
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash"
         )
         private const val CACHE_TTL_MS = 15 * 60 * 1000L // 15 minutes TTL
         private const val DHASH_THRESHOLD = 6 // Max 6 bits difference out of 64 (~90% visual match)
@@ -133,11 +131,11 @@ class GeminiVisionService(
 
                 // Match against candidate models in priority order
                 val matched = CANDIDATE_MODELS.firstOrNull { it in modelNames }
+                    ?: modelNames.firstOrNull { it.contains("3.5-flash-lite") }
+                    ?: modelNames.firstOrNull { it.contains("3.6-flash") }
                     ?: modelNames.firstOrNull { it.contains("3.5-flash") }
-                    ?: modelNames.firstOrNull { it.contains("3.8-flash") }
-                    ?: modelNames.firstOrNull { it.contains("1.5-flash") }
                     ?: modelNames.firstOrNull { it.contains("flash") }
-                    ?: "gemini-3.5-flash"
+                    ?: "gemini-3.5-flash-lite"
 
                 activeModel = matched
                 val readable = formatModelDisplayName(matched)
@@ -504,10 +502,11 @@ class GeminiVisionService(
 
     private fun formatModelDisplayName(model: String): String {
         return when (model) {
-            "gemini-3.8-flash" -> "Gemini 3.8 Flash (Latest Flagship)"
-            "gemini-3.7-flash" -> "Gemini 3.7 Flash"
+            "gemini-3.5-flash-lite" -> "Gemini 3.5 Flash-Lite (Ultra-Fast)"
             "gemini-3.6-flash" -> "Gemini 3.6 Flash"
             "gemini-3.5-flash" -> "Gemini 3.5 Flash"
+            "gemini-3.8-flash" -> "Gemini 3.8 Flash"
+            "gemini-3.7-flash" -> "Gemini 3.7 Flash"
             "gemini-3.1-flash-lite" -> "Gemini 3.1 Flash-Lite"
             "gemini-2.5-flash" -> "Gemini 2.5 Flash"
             "gemini-2.0-flash" -> "Gemini 2.0 Flash"
@@ -553,7 +552,19 @@ class GeminiVisionService(
             val finishReason = firstCandidate?.get("finishReason")?.jsonPrimitive?.content
             val content = firstCandidate?.get("content")?.jsonObject
             val parts = content?.get("parts")?.jsonArray
-            val rawText = parts?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+            
+            // Extract from non-thought parts
+            val nonThoughtText = parts?.mapNotNull { partElem ->
+                val partObj = partElem.jsonObject
+                if (partObj["thought"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() == true) null
+                else partObj["text"]?.jsonPrimitive?.content
+            }?.joinToString("")?.trim()
+
+            val rawText = if (!nonThoughtText.isNullOrBlank()) {
+                nonThoughtText
+            } else {
+                parts?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+            }
 
             if (rawText.isNullOrBlank()) {
                 if (finishReason == "SAFETY") {

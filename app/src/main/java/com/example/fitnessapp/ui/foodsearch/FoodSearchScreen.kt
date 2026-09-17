@@ -620,14 +620,36 @@ fun FoodSearchScreen(
                                 )
                                 if (selectedCategory != "⚡ Recent") {
                                     Spacer(modifier = Modifier.height(14.dp))
-                                    Button(
-                                        onClick = { viewModel.searchWithGeminiAi() },
-                                        enabled = !isAiLoading,
-                                        shape = RoundedCornerShape(12.dp)
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Search Online with Gemini AI", fontSize = 13.sp)
+                                        Button(
+                                            onClick = { viewModel.searchWithGeminiAi() },
+                                            enabled = !isAiLoading && searchQuery.isNotBlank(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Search with AI", fontSize = 12.sp)
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                if (searchQuery.isNotBlank()) {
+                                                    viewModel.parseNaturalLanguageMeal(searchQuery)
+                                                } else {
+                                                    showSentenceParserDialog = true
+                                                }
+                                            },
+                                            enabled = !isAiLoading,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Parse to Plate", fontSize = 12.sp)
+                                        }
                                     }
                                 }
                             }
@@ -635,7 +657,7 @@ fun FoodSearchScreen(
                     }
                 } else {
                     items(searchResults, key = { it.id }) { food ->
-                        val plateItem = plateItems.firstOrNull { it.food.id == food.id }
+                        val plateItem = plateItems.firstOrNull { it.food.id == food.id || it.food.name.equals(food.name, ignoreCase = true) }
                         FoodSearchResultCard(
                             food = food,
                             plateItem = plateItem,
@@ -693,7 +715,7 @@ fun FoodSearchScreen(
 
     // AI Natural Language Meal Sentence Parser Dialog
     if (showSentenceParserDialog) {
-        var sentenceText by remember { mutableStateOf("") }
+        var sentenceText by remember { mutableStateOf(searchQuery) }
         AlertDialog(
             onDismissRequest = { showSentenceParserDialog = false },
             icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },

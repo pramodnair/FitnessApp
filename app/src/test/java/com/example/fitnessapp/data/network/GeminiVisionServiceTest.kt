@@ -146,7 +146,8 @@ class GeminiVisionServiceTest {
 
     @Test
     fun testCandidateModelsPriority() {
-        assertEquals("gemini-3.5-flash", GeminiVisionService.CANDIDATE_MODELS.first())
+        assertEquals("gemini-3.5-flash-lite", GeminiVisionService.CANDIDATE_MODELS.first())
+        assertTrue(GeminiVisionService.CANDIDATE_MODELS.contains("gemini-3.5-flash"))
         assertTrue(!GeminiVisionService.CANDIDATE_MODELS.contains("gemini-2.0-flash"))
     }
 }

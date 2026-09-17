@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -75,7 +76,7 @@ class FoodSearchViewModel(
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
-    val plateNutritionTotals: StateFlow<PlateNutritionTotals> = _plateItems.combine(_plateItems) { items, _ ->
+    val plateNutritionTotals: StateFlow<PlateNutritionTotals> = _plateItems.map { items ->
         var cal = 0
         var pro = 0f
         var carbs = 0f
@@ -146,9 +147,10 @@ class FoodSearchViewModel(
                         result.add(found)
                     } else {
                         val portion = item.portionDescription.ifBlank { "1 serving" }
+                        val cleanId = "recent_${item.name.lowercase().trim().replace(Regex("[^a-z0-9]"), "_")}"
                         result.add(
                             FoodItemDefinition(
-                                id = UUID.randomUUID().toString(),
+                                id = cleanId,
                                 name = item.name,
                                 category = "Recent",
                                 servingUnit = portion,
@@ -207,10 +209,10 @@ class FoodSearchViewModel(
     private fun refreshLocalSearch() {
         val category = _selectedCategory.value
         val query = _searchQuery.value
-        if (category.equals("Recent", ignoreCase = true)) {
+        if (category.contains("Recent", ignoreCase = true)) {
             val recents = recentFoods.value
             _searchResults.value = if (query.isBlank()) recents else recents.filter { it.name.contains(query, ignoreCase = true) }
-        } else if (category.equals("My Combos", ignoreCase = true)) {
+        } else if (category.contains("Combos", ignoreCase = true)) {
             _searchResults.value = emptyList()
         } else {
             val results = searchService.searchLocal(query, category)
@@ -277,7 +279,9 @@ class FoodSearchViewModel(
 
     fun addToPlate(food: FoodItemDefinition, quantity: Float = 1.0f) {
         val currentList = _plateItems.value.toMutableList()
-        val index = currentList.indexOfFirst { it.food.name.equals(food.name, ignoreCase = true) }
+        val index = currentList.indexOfFirst {
+            it.food.id == food.id || it.food.name.equals(food.name, ignoreCase = true)
+        }
         if (index >= 0) {
             val existing = currentList[index]
             val newQty = existing.quantity + quantity
@@ -290,7 +294,7 @@ class FoodSearchViewModel(
 
     fun incrementPlateItem(foodId: String) {
         val currentList = _plateItems.value.toMutableList()
-        val index = currentList.indexOfFirst { it.food.id == foodId }
+        val index = currentList.indexOfFirst { it.food.id == foodId || it.food.name.equals(foodId, ignoreCase = true) }
         if (index >= 0) {
             val item = currentList[index]
             val step = if (item.food.servingUnit.equals("gram", ignoreCase = true) || item.food.servingUnit.equals("g", ignoreCase = true)) 25f
@@ -303,7 +307,7 @@ class FoodSearchViewModel(
 
     fun decrementPlateItem(foodId: String) {
         val currentList = _plateItems.value.toMutableList()
-        val index = currentList.indexOfFirst { it.food.id == foodId }
+        val index = currentList.indexOfFirst { it.food.id == foodId || it.food.name.equals(foodId, ignoreCase = true) }
         if (index >= 0) {
             val item = currentList[index]
             val step = if (item.food.servingUnit.equals("gram", ignoreCase = true) || item.food.servingUnit.equals("g", ignoreCase = true)) 25f
@@ -321,7 +325,7 @@ class FoodSearchViewModel(
 
     fun updatePlateItemQuantity(foodId: String, newQuantity: Float) {
         val currentList = _plateItems.value.toMutableList()
-        val index = currentList.indexOfFirst { it.food.id == foodId }
+        val index = currentList.indexOfFirst { it.food.id == foodId || it.food.name.equals(foodId, ignoreCase = true) }
         if (index >= 0) {
             if (newQuantity <= 0f) {
                 currentList.removeAt(index)
@@ -334,7 +338,7 @@ class FoodSearchViewModel(
 
     fun removeFromPlate(foodId: String) {
         val currentList = _plateItems.value.toMutableList()
-        currentList.removeAll { it.food.id == foodId }
+        currentList.removeAll { it.food.id == foodId || it.food.name.equals(foodId, ignoreCase = true) }
         _plateItems.value = currentList
     }
 
