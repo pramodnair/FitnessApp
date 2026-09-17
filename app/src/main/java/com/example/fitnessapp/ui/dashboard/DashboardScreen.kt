@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -53,6 +54,7 @@ import java.util.Locale
 fun DashboardScreen(
     onNavigateToScanner: () -> Unit,
     onNavigateToManualEntry: () -> Unit,
+    onNavigateToFoodSearch: () -> Unit = onNavigateToManualEntry,
     onNavigateToSettings: () -> Unit,
     onNavigateToPartner: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -138,13 +140,13 @@ fun DashboardScreen(
                     }
 
                     OutlinedButton(
-                        onClick = onNavigateToManualEntry,
+                        onClick = onNavigateToFoodSearch,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Quick Add", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Search & Add", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 

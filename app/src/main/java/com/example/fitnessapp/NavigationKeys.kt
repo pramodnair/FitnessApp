@@ -8,5 +8,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object BodyProgressNav : NavKey
 @Serializable data object PartnerNav : NavKey
 @Serializable data object ScannerNav : NavKey
+@Serializable data object FoodSearchNav : NavKey
 @Serializable data object SettingsNav : NavKey
 @Serializable data object OnboardingNav : NavKey

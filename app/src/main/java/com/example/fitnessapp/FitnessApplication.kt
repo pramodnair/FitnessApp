@@ -13,6 +13,9 @@ class FitnessApplication : Application() {
     lateinit var geminiVisionService: GeminiVisionService
         private set
 
+    lateinit var foodNutritionSearchService: com.example.fitnessapp.data.nutrition.FoodNutritionSearchService
+        private set
+
     lateinit var syncCoordinator: com.example.fitnessapp.data.sync.SyncCoordinator
         private set
 
@@ -21,6 +24,7 @@ class FitnessApplication : Application() {
         instance = this
         repository = AppFitnessRepository(this)
         geminiVisionService = GeminiVisionService()
+        foodNutritionSearchService = com.example.fitnessapp.data.nutrition.FoodNutritionSearchService(this)
         syncCoordinator = com.example.fitnessapp.data.sync.SyncCoordinator(this, repository)
         syncCoordinator.start()
     }

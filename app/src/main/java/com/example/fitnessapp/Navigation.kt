@@ -26,6 +26,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.fitnessapp.ui.bodyprogress.BodyProgressScreen
 import com.example.fitnessapp.ui.dashboard.DashboardScreen
+import com.example.fitnessapp.ui.foodsearch.FoodSearchScreen
 import com.example.fitnessapp.ui.onboarding.OnboardingScreen
 import com.example.fitnessapp.ui.partner.PartnerScreen
 import com.example.fitnessapp.ui.profile.ProfileSetupScreen
@@ -52,7 +53,7 @@ fun MainNavigation() {
     var showManualEntryDialog by remember { mutableStateOf(false) }
 
     val currentTop = backStack.lastOrNull()
-    val isFullScreen = currentTop == ScannerNav || currentTop == SettingsNav || currentTop == OnboardingNav
+    val isFullScreen = currentTop == ScannerNav || currentTop == SettingsNav || currentTop == OnboardingNav || currentTop == FoodSearchNav
 
     NavDisplay(
         backStack = backStack,
@@ -87,6 +88,7 @@ fun MainNavigation() {
                             BottomTab.DASHBOARD -> DashboardScreen(
                                 onNavigateToScanner = { backStack.add(ScannerNav) },
                                 onNavigateToManualEntry = { showManualEntryDialog = true },
+                                onNavigateToFoodSearch = { backStack.add(FoodSearchNav) },
                                 onNavigateToSettings = { backStack.add(SettingsNav) },
                                 onNavigateToPartner = { currentTab = BottomTab.PARTNER_DUEL }
                             )
@@ -112,6 +114,12 @@ fun MainNavigation() {
 
             entry<ScannerNav> {
                 FoodScannerScreen(
+                    onNavigateBack = { backStack.removeLastOrNull() }
+                )
+            }
+
+            entry<FoodSearchNav> {
+                FoodSearchScreen(
                     onNavigateBack = { backStack.removeLastOrNull() }
                 )
             }
