@@ -64,5 +64,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         val isLockEnabled = FitnessApplication.instance.repository.isAppLockEnabled.value
         AppLockManager.onActivityResumed(isLockEnabled)
+        FitnessApplication.instance.stepTrackerManager.refreshTodaySteps()
+        FitnessApplication.instance.stepTrackerManager.startTracking()
     }
 }

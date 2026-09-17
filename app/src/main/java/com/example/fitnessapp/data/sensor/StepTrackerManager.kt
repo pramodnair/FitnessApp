@@ -1,11 +1,15 @@
 package com.example.fitnessapp.data.sensor
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,9 +41,16 @@ class StepTrackerManager(private val context: Context) : SensorEventListener {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
-    private fun loadTodaySteps(): Int {
+    fun loadTodaySteps(): Int {
         val today = getTodayDate()
         return prefs.getInt("steps_$today", 0)
+    }
+
+    fun refreshTodaySteps() {
+        val today = getTodayDate()
+        val steps = prefs.getInt("steps_$today", 0)
+        _todaySteps.value = steps
+        _caloriesBurned.value = calculateBurnedCalories(steps, userWeightKg)
     }
 
     fun updateUserWeight(weightKg: Float) {
@@ -50,23 +61,71 @@ class StepTrackerManager(private val context: Context) : SensorEventListener {
     }
 
     fun startTracking() {
-        if (isRegistered || sensorManager == null) return
+        if (sensorManager == null) {
+            Log.w(TAG, "SensorManager unavailable")
+            return
+        }
+
+        // Validate runtime permission on Android 10+ (API 29+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val hasPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasPerm) {
+                Log.w(TAG, "Cannot start tracking: ACTIVITY_RECOGNITION not granted")
+                isRegistered = false
+                return
+            }
+        }
+
+        // Clean unregister first to avoid duplicate callbacks or stale state
+        if (isRegistered) {
+            try {
+                sensorManager.unregisterListener(this)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error unregistering listener: ${e.message}")
+            }
+            isRegistered = false
+        }
+
+        var anyRegistered = false
+
+        // Register TYPE_STEP_COUNTER (delivers cumulative hardware steps since boot)
         if (stepCounterSensor != null) {
-            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI)
-            isRegistered = true
-            Log.d("StepTrackerManager", "Registered TYPE_STEP_COUNTER sensor")
-        } else if (stepDetectorSensor != null) {
-            sensorManager.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_UI)
-            isRegistered = true
-            Log.d("StepTrackerManager", "Registered TYPE_STEP_DETECTOR fallback sensor")
-        } else {
-            Log.w("StepTrackerManager", "No step sensor available on this hardware")
+            val success = sensorManager.registerListener(
+                this,
+                stepCounterSensor,
+                SensorManager.SENSOR_DELAY_UI
+            )
+            Log.d(TAG, "Registered TYPE_STEP_COUNTER: $success")
+            if (success) anyRegistered = true
+        }
+
+        // Also register TYPE_STEP_DETECTOR (delivers instant real-time events on every single step)
+        if (stepDetectorSensor != null) {
+            val success = sensorManager.registerListener(
+                this,
+                stepDetectorSensor,
+                SensorManager.SENSOR_DELAY_UI
+            )
+            Log.d(TAG, "Registered TYPE_STEP_DETECTOR: $success")
+            if (success) anyRegistered = true
+        }
+
+        isRegistered = anyRegistered
+        if (!anyRegistered) {
+            Log.w(TAG, "Failed to register step sensors")
         }
     }
 
     fun stopTracking() {
         if (isRegistered && sensorManager != null) {
-            sensorManager.unregisterListener(this)
+            try {
+                sensorManager.unregisterListener(this)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping tracking: ${e.message}")
+            }
             isRegistered = false
         }
     }
@@ -79,9 +138,17 @@ class StepTrackerManager(private val context: Context) : SensorEventListener {
             val totalRawSteps = event.values[0].toInt()
             val savedBaseline = prefs.getInt("baseline_$today", -1)
 
-            val currentBaseline = if (savedBaseline == -1 || totalRawSteps < savedBaseline) {
-                // First event of the day or reboot occurred
+            val currentBaseline = if (savedBaseline == -1) {
+                // First event of the day: establish baseline
                 prefs.edit().putInt("baseline_$today", totalRawSteps).apply()
+                totalRawSteps
+            } else if (totalRawSteps < savedBaseline) {
+                // Device rebooted: preserve previously accumulated steps
+                val currentSteps = _todaySteps.value
+                prefs.edit()
+                    .putInt("manual_offset_$today", currentSteps)
+                    .putInt("baseline_$today", totalRawSteps)
+                    .apply()
                 totalRawSteps
             } else {
                 savedBaseline
@@ -89,13 +156,15 @@ class StepTrackerManager(private val context: Context) : SensorEventListener {
 
             val stepsFromSensor = (totalRawSteps - currentBaseline).coerceAtLeast(0)
             val manualOffset = prefs.getInt("manual_offset_$today", 0)
-            val computedSteps = stepsFromSensor + manualOffset
+            val computedSteps = maxOf(stepsFromSensor + manualOffset, _todaySteps.value)
 
+            Log.d(TAG, "TYPE_STEP_COUNTER updated: $computedSteps (raw=$totalRawSteps, baseline=$currentBaseline, offset=$manualOffset)")
             updateSteps(computedSteps, today)
         } else if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
-            // Incremental 1 step per event
-            val current = loadTodaySteps() + 1
-            updateSteps(current, today)
+            // Instant incremental event: 1 step detected by hardware
+            val nextSteps = _todaySteps.value + 1
+            Log.d(TAG, "TYPE_STEP_DETECTOR increment: $nextSteps")
+            updateSteps(nextSteps, today)
         }
     }
 
@@ -118,6 +187,8 @@ class StepTrackerManager(private val context: Context) : SensorEventListener {
     }
 
     companion object {
+        private const val TAG = "StepTrackerManager"
+
         fun calculateBurnedCalories(steps: Int, weightKg: Float): Int {
             // Standard metabolic equivalent formula: ~0.04 kcal per step for 70kg, scales linearly with weight
             val factor = (weightKg / 70f) * 0.04f

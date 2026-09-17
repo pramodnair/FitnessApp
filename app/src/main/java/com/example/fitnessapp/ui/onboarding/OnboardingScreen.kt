@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -120,6 +121,15 @@ fun OnboardingScreen(
             }
         )
     }
+    var hasActivityPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        )
+    }
 
     val permissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -127,6 +137,9 @@ fun OnboardingScreen(
         hasCameraPermission = result[Manifest.permission.CAMERA] ?: hasCameraPermission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             hasNotificationPermission = result[Manifest.permission.POST_NOTIFICATIONS] ?: hasNotificationPermission
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            hasActivityPermission = result[Manifest.permission.ACTIVITY_RECOGNITION] ?: hasActivityPermission
         }
         viewModel.completeOnboarding()
         onComplete()
@@ -222,6 +235,9 @@ fun OnboardingScreen(
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             perms.add(Manifest.permission.POST_NOTIFICATIONS)
                                         }
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                            perms.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                                        }
                                         permissionsLauncher.launch(perms.toTypedArray())
                                     },
                                     shape = RoundedCornerShape(12.dp)
@@ -272,6 +288,7 @@ fun OnboardingScreen(
                 3 -> PermissionsPrimerSlide(
                     hasCameraPermission = hasCameraPermission,
                     hasNotificationPermission = hasNotificationPermission,
+                    hasActivityPermission = hasActivityPermission,
                     onSkip = { finishOnboarding() }
                 )
             }
@@ -645,6 +662,7 @@ private fun ProfileSetupSlide(
 private fun PermissionsPrimerSlide(
     hasCameraPermission: Boolean,
     hasNotificationPermission: Boolean,
+    hasActivityPermission: Boolean,
     onSkip: () -> Unit
 ) {
     Column(
@@ -689,6 +707,17 @@ private fun PermissionsPrimerSlide(
         )
 
         Spacer(modifier = Modifier.height(20.dp))
+
+        // Step Counter & Activity Permission Card
+        PermissionCard(
+            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+            title = "Physical Activity (Step Counter)",
+            description = "Needed to read hardware step sensors and accurately count daily steps and burn calories in real time.",
+            isGranted = hasActivityPermission,
+            tag = if (hasActivityPermission) "Granted ✅" else "Recommended"
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Camera Permission Card
         PermissionCard(
