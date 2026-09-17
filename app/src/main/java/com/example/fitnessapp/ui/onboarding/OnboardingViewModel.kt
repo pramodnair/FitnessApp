@@ -17,6 +17,7 @@ class OnboardingViewModel(
     fun saveProfile(profile: UserProfile) {
         viewModelScope.launch {
             repository.updateProfile(profile)
+            repository.updateStartingWeight(profile.startWeightKg)
         }
     }
 

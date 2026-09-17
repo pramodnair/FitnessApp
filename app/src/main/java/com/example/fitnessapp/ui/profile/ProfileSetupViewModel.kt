@@ -18,6 +18,7 @@ class ProfileSetupViewModel(
 
     fun saveProfile(profile: UserProfile) {
         repository.updateProfile(profile)
+        repository.updateStartingWeight(profile.startWeightKg)
     }
 
     fun setGeminiApiKey(key: String) {

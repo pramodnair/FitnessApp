@@ -206,7 +206,57 @@ class AppFitnessRepository(
         if (profile.id == activeUserId) {
             _activeProfile.value = profile
         }
+        syncWeightLogsForProfile(profile)
         recalculateToday()
+    }
+
+    private fun syncWeightLogsForProfile(profile: UserProfile) {
+        if (profile.startWeightKg <= 0f) return
+        val list = _weightLogs.value.toMutableList()
+        val userLogs = list.filter { it.userId == profile.id }
+        val startLog = userLogs.find { it.notes.contains("Starting", ignoreCase = true) } ?: userLogs.lastOrNull()
+        val bmi = BmiCalculator.calculateBmi(profile.startWeightKg, profile.heightCm)
+
+        if (startLog != null) {
+            val idx = list.indexOf(startLog)
+            if (idx >= 0) {
+                list[idx] = startLog.copy(weightKg = profile.startWeightKg, bmi = bmi, notes = "Starting weight")
+            }
+        } else {
+            list.add(
+                WeightLog(
+                    userId = profile.id,
+                    date = getTodayDate(),
+                    weightKg = profile.startWeightKg,
+                    bmi = bmi,
+                    notes = "Starting weight"
+                )
+            )
+        }
+
+        // Keep today's current weight log aligned if current weight differs from starting weight
+        if (profile.currentWeightKg > 0f && profile.currentWeightKg != profile.startWeightKg) {
+            val today = getTodayDate()
+            val currentLog = list.find { it.userId == profile.id && it.date == today && !it.notes.contains("Starting", ignoreCase = true) }
+            val currentBmi = BmiCalculator.calculateBmi(profile.currentWeightKg, profile.heightCm)
+            if (currentLog != null) {
+                val idx = list.indexOf(currentLog)
+                if (idx >= 0) {
+                    list[idx] = currentLog.copy(weightKg = profile.currentWeightKg, bmi = currentBmi)
+                }
+            } else {
+                list.add(0, WeightLog(
+                    userId = profile.id,
+                    date = today,
+                    weightKg = profile.currentWeightKg,
+                    bmi = currentBmi,
+                    notes = "Current weight"
+                ))
+            }
+        }
+
+        _weightLogs.value = list
+        saveWeightLogs(list)
     }
 
     override fun addMeal(meal: MealLog) {
@@ -707,15 +757,28 @@ class AppFitnessRepository(
 
     private fun loadWeightLogs(): List<WeightLog> {
         val str = prefs.getString("saved_weight_logs", null)
+        val today = getTodayDate()
+        val p1 = loadProfile("primary", defaultPrimaryProfile())
+        val p2 = loadProfile("partner", defaultPartnerProfile())
+
         if (str.isNullOrBlank()) {
-            val today = getTodayDate()
             return listOf(
-                WeightLog(userId = "primary", date = today, weightKg = 85f, bmi = 27.8f, notes = "Starting weight"),
-                WeightLog(userId = "partner", date = today, weightKg = 65f, bmi = 23.9f, notes = "Starting weight")
+                WeightLog(userId = "primary", date = today, weightKg = p1.startWeightKg, bmi = BmiCalculator.calculateBmi(p1.startWeightKg, p1.heightCm), notes = "Starting weight"),
+                WeightLog(userId = "partner", date = today, weightKg = p2.startWeightKg, bmi = BmiCalculator.calculateBmi(p2.startWeightKg, p2.heightCm), notes = "Starting weight")
             )
         }
         return try {
-            json.decodeFromString(str)
+            val loaded: List<WeightLog> = json.decodeFromString(str)
+            // Reconcile if user's profile has a different starting weight than a stale initial 85kg default
+            val primaryStartLog = loaded.find { it.userId == "primary" && it.notes.contains("Starting", ignoreCase = true) }
+            if (primaryStartLog != null && p1.startWeightKg > 0f && primaryStartLog.weightKg == 85f && p1.startWeightKg != 85f) {
+                loaded.map {
+                    if (it == primaryStartLog) it.copy(weightKg = p1.startWeightKg, bmi = BmiCalculator.calculateBmi(p1.startWeightKg, p1.heightCm))
+                    else it
+                }
+            } else {
+                loaded
+            }
         } catch (e: Exception) {
             emptyList()
         }

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.Wifi
@@ -58,9 +59,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +88,7 @@ import com.example.fitnessapp.data.model.Gender
 import com.example.fitnessapp.domain.BmiCalculator
 import com.example.fitnessapp.domain.NutritionEngine
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun OnboardingScreen(
@@ -104,7 +108,27 @@ fun OnboardingScreen(
     var heightText by remember(activeProfile) { mutableStateOf(activeProfile.heightCm.toInt().toString()) }
     var startWeightText by remember(activeProfile) { mutableStateOf(activeProfile.startWeightKg.toString()) }
     var currentWeightText by remember(activeProfile) { mutableStateOf(activeProfile.currentWeightKg.toString()) }
+    var targetWeightText by remember(activeProfile) { mutableStateOf(activeProfile.targetWeightKg.toString()) }
+    var selectedTargetBmi by remember(activeProfile) { mutableStateOf(activeProfile.targetBmi) }
+    var autoCalculateTarget by remember(activeProfile) { mutableStateOf(activeProfile.autoCalculateTargetFromBmi) }
     var deficitLevel by remember(activeProfile) { mutableStateOf(activeProfile.deficitLevel) }
+
+    val currentHeight = heightText.toFloatOrNull() ?: activeProfile.heightCm
+
+    LaunchedEffect(currentHeight, startWeightText, deficitLevel, selectedTargetBmi, autoCalculateTarget) {
+        if (autoCalculateTarget && currentHeight > 50f) {
+            val sWeight = startWeightText.toFloatOrNull() ?: activeProfile.startWeightKg
+            val calc = BmiCalculator.calculateTargetWeight(
+                heightCm = currentHeight,
+                startWeightKg = sWeight,
+                targetBmi = selectedTargetBmi,
+                deficitLevel = deficitLevel
+            )
+            if (calc > 0f) {
+                targetWeightText = calc.toString()
+            }
+        }
+    }
 
     // Permissions check
     var hasCameraPermission by remember {
@@ -216,6 +240,9 @@ fun OnboardingScreen(
                                             heightCm = heightText.toFloatOrNull() ?: activeProfile.heightCm,
                                             startWeightKg = startWeightText.toFloatOrNull() ?: activeProfile.startWeightKg,
                                             currentWeightKg = currentWeightText.toFloatOrNull() ?: activeProfile.currentWeightKg,
+                                            targetWeightKg = targetWeightText.toFloatOrNull() ?: activeProfile.targetWeightKg,
+                                            targetBmi = selectedTargetBmi,
+                                            autoCalculateTargetFromBmi = autoCalculateTarget,
                                             deficitLevel = deficitLevel
                                         )
                                         viewModel.saveProfile(updated)
@@ -279,11 +306,40 @@ fun OnboardingScreen(
                     heightText = heightText,
                     onHeightChange = { heightText = it },
                     startWeightText = startWeightText,
-                    onStartWeightChange = { startWeightText = it },
+                    onStartWeightChange = {
+                        startWeightText = it
+                        if (currentWeightText.isBlank() || currentWeightText == "0" || currentWeightText == activeProfile.startWeightKg.toString()) {
+                            currentWeightText = it
+                        }
+                    },
                     currentWeightText = currentWeightText,
                     onCurrentWeightChange = { currentWeightText = it },
+                    targetWeightText = targetWeightText,
+                    onTargetWeightChange = {
+                        targetWeightText = it
+                        autoCalculateTarget = false
+                    },
+                    selectedTargetBmi = selectedTargetBmi,
+                    onTargetBmiChange = {
+                        selectedTargetBmi = it
+                        autoCalculateTarget = true
+                    },
+                    autoCalculateTarget = autoCalculateTarget,
+                    onAutoCalculateChange = { checked ->
+                        autoCalculateTarget = checked
+                    },
                     deficitLevel = deficitLevel,
-                    onDeficitChange = { deficitLevel = it }
+                    onDeficitChange = { level ->
+                        deficitLevel = level
+                        if (autoCalculateTarget) {
+                            when (level) {
+                                DeficitLevel.AGGRESSIVE -> selectedTargetBmi = 21.0f
+                                DeficitLevel.MODERATE -> selectedTargetBmi = 22.0f
+                                DeficitLevel.MILD -> selectedTargetBmi = 23.5f
+                                DeficitLevel.CUSTOM -> {}
+                            }
+                        }
+                    }
                 )
                 3 -> PermissionsPrimerSlide(
                     hasCameraPermission = hasCameraPermission,
@@ -458,13 +514,25 @@ private fun ProfileSetupSlide(
     onStartWeightChange: (String) -> Unit,
     currentWeightText: String,
     onCurrentWeightChange: (String) -> Unit,
+    targetWeightText: String,
+    onTargetWeightChange: (String) -> Unit,
+    selectedTargetBmi: Float,
+    onTargetBmiChange: (Float) -> Unit,
+    autoCalculateTarget: Boolean,
+    onAutoCalculateChange: (Boolean) -> Unit,
     deficitLevel: DeficitLevel,
     onDeficitChange: (DeficitLevel) -> Unit
 ) {
     val h = heightText.toFloatOrNull() ?: 163f
     val w = currentWeightText.toFloatOrNull() ?: 78f
+    val sWeight = startWeightText.toFloatOrNull() ?: w
     val bmi = BmiCalculator.calculateBmi(w, h)
     val cat = BmiCalculator.getCategory(bmi)
+
+    val idealRange = BmiCalculator.getIdealWeightRange(h)
+    val currentTargetWeight = targetWeightText.toFloatOrNull() ?: 70f
+    val resultingTargetBmi = BmiCalculator.calculateBmi(currentTargetWeight, h)
+    val resultingCategory = BmiCalculator.getCategory(resultingTargetBmi)
 
     Column(
         modifier = Modifier
@@ -572,6 +640,107 @@ private fun ProfileSetupSlide(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Target Weight & BMI Calculation Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Target Goal Weight & BMI", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Auto-calculate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Switch(
+                            checked = autoCalculateTarget,
+                            onCheckedChange = onAutoCalculateChange
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Healthy range for ${h.toInt()}cm: ${idealRange.first} - ${idealRange.second} kg (BMI 18.5 - 24.9)",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Target BMI Preset Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = (selectedTargetBmi == 21.0f),
+                        onClick = { onTargetBmiChange(21.0f) },
+                        label = { Text("Lean 21.0", fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = (selectedTargetBmi == 22.0f),
+                        onClick = { onTargetBmiChange(22.0f) },
+                        label = { Text("⭐ Optimal 22.0", fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = (selectedTargetBmi == 23.5f),
+                        onClick = { onTargetBmiChange(23.5f) },
+                        label = { Text("Fit 23.5", fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = targetWeightText,
+                    onValueChange = onTargetWeightChange,
+                    label = { Text("Target Goal Weight (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Target Result Indicator
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Target: $targetWeightText kg  ➔  BMI: $resultingTargetBmi (${resultingCategory.label})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Deficit Pace Selection
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -627,6 +796,7 @@ private fun ProfileSetupSlide(
         Spacer(modifier = Modifier.height(14.dp))
 
         // Live calculation summary pill
+        val weightToLose = (sWeight - currentTargetWeight).coerceAtLeast(0f)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -640,8 +810,8 @@ private fun ProfileSetupSlide(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Baseline BMI: $bmi", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                    Text("Category: ${cat.label}", fontSize = 11.sp, color = Color(cat.colorHex))
+                    Text("Baseline BMI: $bmi (${cat.label})", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("Goal: Lose ${(weightToLose * 10f).roundToInt() / 10f} kg ➔ Target BMI $resultingTargetBmi", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Box(
                     modifier = Modifier

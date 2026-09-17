@@ -61,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -118,9 +119,33 @@ fun ProfileSetupScreen(
 
     fun applyTargetBmi(bmi: Float) {
         selectedTargetBmi = bmi
+        autoCalculateTarget = true
         if (currentHeight > 50f) {
-            val calcWeight = com.example.fitnessapp.domain.BmiCalculator.getWeightForBmi(bmi, currentHeight)
-            targetWeightText = calcWeight.toString()
+            val sWeight = startWeightText.toFloatOrNull() ?: profile.startWeightKg
+            val calcWeight = com.example.fitnessapp.domain.BmiCalculator.calculateTargetWeight(
+                heightCm = currentHeight,
+                startWeightKg = sWeight,
+                targetBmi = bmi,
+                deficitLevel = deficitLevel
+            )
+            if (calcWeight > 0f) {
+                targetWeightText = calcWeight.toString()
+            }
+        }
+    }
+
+    LaunchedEffect(currentHeight, startWeightText, deficitLevel, selectedTargetBmi, autoCalculateTarget) {
+        if (autoCalculateTarget && currentHeight > 50f) {
+            val sWeight = startWeightText.toFloatOrNull() ?: profile.startWeightKg
+            val calc = com.example.fitnessapp.domain.BmiCalculator.calculateTargetWeight(
+                heightCm = currentHeight,
+                startWeightKg = sWeight,
+                targetBmi = selectedTargetBmi,
+                deficitLevel = deficitLevel
+            )
+            if (calc > 0f) {
+                targetWeightText = calc.toString()
+            }
         }
     }
 
@@ -200,14 +225,7 @@ fun ProfileSetupScreen(
                         )
                         OutlinedTextField(
                             value = heightText,
-                            onValueChange = {
-                                heightText = it
-                                val h = it.toFloatOrNull() ?: 0f
-                                if (autoCalculateTarget && h > 50f) {
-                                    val calc = com.example.fitnessapp.domain.BmiCalculator.getWeightForBmi(selectedTargetBmi, h)
-                                    targetWeightText = calc.toString()
-                                }
-                            },
+                            onValueChange = { heightText = it },
                             label = { Text("Height (cm)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
@@ -223,7 +241,12 @@ fun ProfileSetupScreen(
                     ) {
                         OutlinedTextField(
                             value = startWeightText,
-                            onValueChange = { startWeightText = it },
+                            onValueChange = {
+                                startWeightText = it
+                                if (currentWeightText.isBlank() || currentWeightText == "0" || currentWeightText == profile.startWeightKg.toString()) {
+                                    currentWeightText = it
+                                }
+                            },
                             label = { Text("Starting Weight (kg)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
@@ -390,7 +413,17 @@ fun ProfileSetupScreen(
                         ) {
                             FilterChip(
                                 selected = deficitLevel == level,
-                                onClick = { deficitLevel = level },
+                                onClick = {
+                                    deficitLevel = level
+                                    if (autoCalculateTarget) {
+                                        when (level) {
+                                            DeficitLevel.AGGRESSIVE -> selectedTargetBmi = 21.0f
+                                            DeficitLevel.MODERATE -> selectedTargetBmi = 22.0f
+                                            DeficitLevel.MILD -> selectedTargetBmi = 23.5f
+                                            DeficitLevel.CUSTOM -> {}
+                                        }
+                                    }
+                                },
                                 label = { Text(level.label, fontSize = 11.sp) }
                             )
                         }

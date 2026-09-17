@@ -1,5 +1,6 @@
 package com.example.fitnessapp.domain
 
+import com.example.fitnessapp.data.model.DeficitLevel
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -62,5 +63,41 @@ object BmiCalculator {
 
     fun calculateTargetWeight(heightCm: Float, targetBmi: Float = 22.0f): Float {
         return getWeightForBmi(targetBmi, heightCm)
+    }
+
+    /**
+     * Calculates recommended target weight based on height, starting weight, target BMI, and deficit pace.
+     */
+    fun calculateTargetWeight(
+        heightCm: Float,
+        startWeightKg: Float,
+        targetBmi: Float = 22.0f,
+        deficitLevel: DeficitLevel = DeficitLevel.MODERATE
+    ): Float {
+        if (heightCm <= 50f) return 0f
+
+        val effectiveBmi = when (deficitLevel) {
+            DeficitLevel.AGGRESSIVE -> if (targetBmi >= 22f) 21.0f else targetBmi
+            DeficitLevel.MODERATE -> if (targetBmi != 22f && targetBmi != 21f && targetBmi != 23.5f) targetBmi else 22.0f
+            DeficitLevel.MILD -> if (targetBmi <= 22f) 23.5f else targetBmi
+            DeficitLevel.CUSTOM -> targetBmi
+        }
+
+        var idealWeight = getWeightForBmi(effectiveBmi, heightCm)
+
+        // If starting weight is entered and is already at or below calculated ideal weight:
+        if (startWeightKg > 0f && startWeightKg <= idealWeight) {
+            val reduction = when (deficitLevel) {
+                DeficitLevel.MILD -> 2f
+                DeficitLevel.MODERATE -> 4f
+                DeficitLevel.AGGRESSIVE -> 6f
+                DeficitLevel.CUSTOM -> 3f
+            }
+            val minSafeWeight = getWeightForBmi(19.0f, heightCm)
+            idealWeight = (startWeightKg - reduction).coerceAtLeast(minSafeWeight)
+            idealWeight = (idealWeight * 10f).roundToInt() / 10f
+        }
+
+        return idealWeight
     }
 }
