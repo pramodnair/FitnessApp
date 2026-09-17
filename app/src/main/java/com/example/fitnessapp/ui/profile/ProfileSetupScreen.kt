@@ -19,13 +19,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.fitnessapp.FitnessApplication
+import com.example.fitnessapp.data.security.AppLockManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -580,6 +586,111 @@ fun ProfileSetupScreen(
                         Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Send Test Notification", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // App Lock & Biometric Security Card
+            val repository = FitnessApplication.instance.repository
+            val isAppLockEnabled by repository.isAppLockEnabled.collectAsStateWithLifecycle()
+            val activity = context as? FragmentActivity
+            val hasSystemLock = remember(context) { AppLockManager.canAuthenticate(context) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("App Lock & Biometric Privacy", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Require system biometric (Fingerprint, Face) or device PIN/Pattern whenever NutriFit AI is opened or resumed.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Enable App Lock", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text(
+                                if (hasSystemLock) "Uses your device's default security" else "No screen lock setup on this device",
+                                fontSize = 11.sp,
+                                color = if (hasSystemLock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Switch(
+                            checked = isAppLockEnabled,
+                            enabled = hasSystemLock,
+                            onCheckedChange = { enable ->
+                                if (enable && activity != null) {
+                                    AppLockManager.authenticate(
+                                        activity = activity,
+                                        title = "Enable NutriFit App Lock",
+                                        subtitle = "Verify your identity to activate app lock",
+                                        onSuccess = {
+                                            repository.setAppLockEnabled(true)
+                                            AppLockManager.setUnlocked(true)
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("App Lock activated with system defaults!")
+                                            }
+                                        },
+                                        onError = { error ->
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Could not enable: $error")
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    repository.setAppLockEnabled(false)
+                                    AppLockManager.setUnlocked(true)
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("App Lock disabled.")
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    if (isAppLockEnabled && activity != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                AppLockManager.authenticate(
+                                    activity = activity,
+                                    title = "Test App Unlock",
+                                    subtitle = "Confirming system authentication works properly",
+                                    onSuccess = {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Authentication successful! System defaults working.")
+                                        }
+                                    },
+                                    onError = { error ->
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Auth result: $error")
+                                        }
+                                    }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Test Unlock Now", fontSize = 12.sp)
+                        }
                     }
                 }
             }

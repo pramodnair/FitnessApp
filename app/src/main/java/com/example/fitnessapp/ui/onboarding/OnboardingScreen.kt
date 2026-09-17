@@ -35,11 +35,15 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
@@ -333,17 +337,41 @@ private fun WelcomeSlide() {
         Spacer(modifier = Modifier.height(12.dp))
 
         FeatureHighlightCard(
-            icon = Icons.Default.TrendingDown,
-            title = "Scientific Calorie Deficit Engine",
-            description = "Personalized Mifflin-St Jeor metabolism formulas calculate healthy daily budgets, BMI milestones, and safe weight loss."
+            icon = Icons.Default.Mic,
+            title = "Voice Logging & Plate Builder",
+            description = "Speak your entire meal naturally or multi-item search with quantity multipliers and instant plate staging."
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         FeatureHighlightCard(
-            icon = Icons.Default.Wifi,
-            title = "Encrypted Local Partner Duel",
-            description = "Sync effortlessly with your partner over local Wi-Fi. 100% private, zero cloud lock-in, and offline-first."
+            icon = Icons.Default.Timer,
+            title = "Intermittent Fasting Tracker",
+            description = "16:8, 14:10, or custom schedules with live countdowns, fasting stages, and hydration reminders."
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FeatureHighlightCard(
+            icon = Icons.Default.TrendingDown,
+            title = "7-Day Smoothed Weight Trends",
+            description = "Mifflin-St Jeor metabolic engine with 7-day exponential moving average to filter daily water fluctuations."
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FeatureHighlightCard(
+            icon = Icons.Default.EmojiEvents,
+            title = "3-Pillar Local Partner Duel",
+            description = "Compete in calories, steps & hydration over local Wi-Fi with encrypted, zero-cloud peer-to-peer sync."
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FeatureHighlightCard(
+            icon = Icons.Default.Fingerprint,
+            title = "System App Lock & Privacy",
+            description = "Protect your personal health logs with system biometric, fingerprint, face, or device PIN/pattern lock."
         )
 
         Spacer(modifier = Modifier.height(36.dp))

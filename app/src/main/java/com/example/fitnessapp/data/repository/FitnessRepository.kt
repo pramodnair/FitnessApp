@@ -43,6 +43,7 @@ interface FitnessRepository {
     val incomingCheer: StateFlow<String?>
     val hasCompletedOnboarding: StateFlow<Boolean>
     val fastingState: StateFlow<FastingState>
+    val isAppLockEnabled: StateFlow<Boolean>
 
     fun switchActiveProfile(userId: String)
     fun updateProfile(profile: UserProfile)
@@ -58,6 +59,7 @@ interface FitnessRepository {
     fun resetWater()
     fun setGeminiApiKey(apiKey: String)
     fun setPinLock(pin: String)
+    fun setAppLockEnabled(enabled: Boolean)
     fun setPairCode(code: String)
     fun updateSyncedPartnerScore(score: UserDailyScore)
     fun getCurrentUserDailyScore(): UserDailyScore
@@ -138,6 +140,9 @@ class AppFitnessRepository(
 
     private val _fastingState = MutableStateFlow(loadFastingState())
     override val fastingState: StateFlow<FastingState> = _fastingState.asStateFlow()
+
+    private val _isAppLockEnabled = MutableStateFlow(prefs.getBoolean("app_lock_enabled", false))
+    override val isAppLockEnabled: StateFlow<Boolean> = _isAppLockEnabled.asStateFlow()
 
     init {
         recalculateToday()
@@ -458,6 +463,11 @@ class AppFitnessRepository(
             date = today,
             isPartnerSynced = isSynced
         )
+    }
+
+    override fun setAppLockEnabled(enabled: Boolean) {
+        _isAppLockEnabled.value = enabled
+        prefs.edit().putBoolean("app_lock_enabled", enabled).apply()
     }
 
     override fun setPairCode(code: String) {
