@@ -357,7 +357,8 @@ private fun ExpandableMealItemRow(
                     Text(
                         text = "💡 AI Insights: ${meal.aiInsights}",
                         fontSize = 11.sp,
-                        color = Color(0xFF00796B),
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
                         lineHeight = 15.sp
                     )
                 }

@@ -79,6 +79,8 @@ fun CalorieMeterCard(
                 CalorieWarningLevel.SAFE -> Color(0xFF43A047)
             }
 
+            val trackColor = MaterialTheme.colorScheme.surfaceVariant
+
             Box(
                 modifier = Modifier.size(170.dp),
                 contentAlignment = Alignment.Center
@@ -87,7 +89,7 @@ fun CalorieMeterCard(
                     val strokeWidth = 14.dp.toPx()
                     // Background track
                     drawCircle(
-                        color = Color(0xFFEEEEEE),
+                        color = trackColor,
                         style = Stroke(width = strokeWidth)
                     )
                     // Progress arc

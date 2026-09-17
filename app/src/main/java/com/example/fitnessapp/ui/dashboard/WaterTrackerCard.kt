@@ -33,6 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+
 @Composable
 fun WaterTrackerCard(
     currentMl: Int,
@@ -40,6 +44,13 @@ fun WaterTrackerCard(
     onAddWater: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val waterContainer = if (isDark) Color(0xFF00364A) else Color(0xFFE1F5FE)
+    val waterPrimary = if (isDark) Color(0xFF68D3FF) else Color(0xFF0288D1)
+    val waterPillBg = if (isDark) Color(0xFF003730) else Color(0xFFE0F7FA)
+    val waterPillText = if (isDark) Color(0xFF4DB6AC) else Color(0xFF00838F)
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -61,13 +72,13 @@ fun WaterTrackerCard(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFE1F5FE)),
+                            .background(waterContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.WaterDrop,
                             contentDescription = null,
-                            tint = Color(0xFF0288D1),
+                            tint = waterPrimary,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -84,7 +95,7 @@ fun WaterTrackerCard(
                             text = "$currentMl / $targetMl ml • ${(fraction * 100).toInt()}%",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0288D1)
+                            color = waterPrimary
                         )
                     }
                 }
@@ -94,14 +105,14 @@ fun WaterTrackerCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFE0F7FA))
+                        .background(waterPillBg)
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "💧 $glasses glasses",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00838F)
+                        color = waterPillText
                     )
                 }
             }
@@ -115,8 +126,8 @@ fun WaterTrackerCard(
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = Color(0xFF0288D1),
-                trackColor = Color(0xFFE1F5FE)
+                color = waterPrimary,
+                trackColor = waterContainer
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -127,11 +138,14 @@ fun WaterTrackerCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ElevatedButton(
-                    onClick = { onAddWater(250) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onAddWater(250)
+                    },
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = Color(0xFFE1F5FE),
-                        contentColor = Color(0xFF0288D1)
+                        containerColor = waterContainer,
+                        contentColor = waterPrimary
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -141,11 +155,14 @@ fun WaterTrackerCard(
                 }
 
                 ElevatedButton(
-                    onClick = { onAddWater(500) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onAddWater(500)
+                    },
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = Color(0xFFE1F5FE),
-                        contentColor = Color(0xFF0288D1)
+                        containerColor = waterContainer,
+                        contentColor = waterPrimary
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -156,7 +173,10 @@ fun WaterTrackerCard(
 
                 if (currentMl > 0) {
                     OutlinedButton(
-                        onClick = { onAddWater(-250) },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onAddWater(-250)
+                        },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.weight(0.7f)
                     ) {

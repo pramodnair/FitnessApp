@@ -2,6 +2,7 @@ package com.example.fitnessapp.data.repository
 
 import android.content.Context
 import com.example.fitnessapp.data.model.ActivityLevel
+import com.example.fitnessapp.data.model.AppThemeMode
 import com.example.fitnessapp.data.model.BodyPhoto
 import com.example.fitnessapp.data.model.BodyPose
 import com.example.fitnessapp.data.model.DailyNutritionSummary
@@ -60,6 +61,8 @@ interface FitnessRepository {
     fun setGeminiApiKey(apiKey: String)
     fun setPinLock(pin: String)
     fun setAppLockEnabled(enabled: Boolean)
+    val themeMode: StateFlow<AppThemeMode>
+    fun setThemeMode(mode: AppThemeMode)
     fun setPairCode(code: String)
     fun updateSyncedPartnerScore(score: UserDailyScore)
     fun getCurrentUserDailyScore(): UserDailyScore
@@ -143,6 +146,18 @@ class AppFitnessRepository(
 
     private val _isAppLockEnabled = MutableStateFlow(prefs.getBoolean("app_lock_enabled", false))
     override val isAppLockEnabled: StateFlow<Boolean> = _isAppLockEnabled.asStateFlow()
+
+    private fun loadThemeMode(): AppThemeMode {
+        val saved = prefs.getString("app_theme_mode", AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name
+        return try {
+            AppThemeMode.valueOf(saved)
+        } catch (e: Exception) {
+            AppThemeMode.SYSTEM
+        }
+    }
+
+    private val _themeMode = MutableStateFlow(loadThemeMode())
+    override val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
     init {
         recalculateToday()
@@ -468,6 +483,11 @@ class AppFitnessRepository(
     override fun setAppLockEnabled(enabled: Boolean) {
         _isAppLockEnabled.value = enabled
         prefs.edit().putBoolean("app_lock_enabled", enabled).apply()
+    }
+
+    override fun setThemeMode(mode: AppThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("app_theme_mode", mode.name).apply()
     }
 
     override fun setPairCode(code: String) {

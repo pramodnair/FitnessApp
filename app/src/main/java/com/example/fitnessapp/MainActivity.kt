@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.fitnessapp.data.model.AppThemeMode
 import com.example.fitnessapp.data.security.AppLockManager
 import com.example.fitnessapp.theme.FitnessAppTheme
 import com.example.fitnessapp.ui.security.AppLockScreen
@@ -23,7 +25,15 @@ class MainActivity : FragmentActivity() {
         val repository = FitnessApplication.instance.repository
 
         setContent {
-            FitnessAppTheme {
+            val themeMode by repository.themeMode.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            val isDarkTheme = when (themeMode) {
+                AppThemeMode.SYSTEM -> systemDark
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+
+            FitnessAppTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
