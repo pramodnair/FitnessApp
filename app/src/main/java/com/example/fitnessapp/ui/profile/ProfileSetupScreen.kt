@@ -20,9 +20,12 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -488,6 +491,95 @@ fun ProfileSetupScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Smart Notifications & Reminders Card
+            val context = LocalContext.current
+            var hydrationRemindersEnabled by remember { mutableStateOf(true) }
+            var mealRemindersEnabled by remember { mutableStateOf(true) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Smart Reminders & Notifications", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Local on-device alerts to help you hit your hydration goals, fasts, and meal tracking consistency.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Hydration Reminders", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Gentle water alerts every 2 hours (9 AM - 9 PM)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = hydrationRemindersEnabled,
+                            onCheckedChange = {
+                                hydrationRemindersEnabled = it
+                                if (it) {
+                                    com.example.fitnessapp.data.notification.ReminderScheduler.scheduleNextHydration(context)
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Meal Logging Prompts", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Lunch (1:30 PM) & Dinner (8:30 PM) check-ins", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = mealRemindersEnabled,
+                            onCheckedChange = {
+                                mealRemindersEnabled = it
+                                if (it) {
+                                    com.example.fitnessapp.data.notification.ReminderScheduler.scheduleNextMeal(context, true)
+                                    com.example.fitnessapp.data.notification.ReminderScheduler.scheduleNextMeal(context, false)
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            com.example.fitnessapp.data.notification.FitnessNotificationHelper.showHydrationNotification(context, 1500, 3000)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Test notification sent! Check your notification shade.")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Send Test Notification", fontSize = 12.sp)
                     }
                 }
             }

@@ -303,6 +303,15 @@ fun WeightTrackerScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            // 7-Day Smoothed EMA Trend Chart
+            WeightTrendChart(
+                logs = userLogs,
+                targetWeightKg = activeProfile.targetWeightKg,
+                startWeightKg = activeProfile.startWeightKg
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
             // Sub-Menu Filter for History
             var historyFilter by remember { mutableStateOf("ALL") }
             val nowMs = remember { System.currentTimeMillis() }

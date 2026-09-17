@@ -35,6 +35,8 @@ class FitnessApplication : Application() {
         stepTrackerManager = com.example.fitnessapp.data.sensor.StepTrackerManager(this)
         syncCoordinator = com.example.fitnessapp.data.sync.SyncCoordinator(this, repository)
         syncCoordinator.start()
+        com.example.fitnessapp.data.notification.FitnessNotificationHelper.createNotificationChannels(this)
+        com.example.fitnessapp.data.notification.ReminderScheduler.rescheduleAll(this)
     }
 
     companion object {

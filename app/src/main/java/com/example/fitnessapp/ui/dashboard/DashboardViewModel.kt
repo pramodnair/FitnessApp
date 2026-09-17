@@ -34,6 +34,19 @@ class DashboardViewModel(
 
     val todaySteps: StateFlow<Int> = FitnessApplication.instance.stepTrackerManager.todaySteps
     val caloriesBurned: StateFlow<Int> = FitnessApplication.instance.stepTrackerManager.caloriesBurned
+    val fastingState: StateFlow<com.example.fitnessapp.data.model.FastingState> = repository.fastingState
+
+    fun startFast(targetHours: Int = 16, startTimeMs: Long = System.currentTimeMillis()) {
+        repository.startFast(targetHours, startTimeMs)
+    }
+
+    fun endFast() {
+        repository.endFast()
+    }
+
+    fun updateFastingTarget(targetHours: Int) {
+        repository.updateFastingTarget(targetHours)
+    }
 
     init {
         FitnessApplication.instance.stepTrackerManager.updateUserWeight(activeProfile.value.currentWeightKg)

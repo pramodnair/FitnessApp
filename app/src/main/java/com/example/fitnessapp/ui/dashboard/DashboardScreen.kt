@@ -84,6 +84,7 @@ fun DashboardScreen(
     val displayMeals by viewModel.displayMeals.collectAsStateWithLifecycle()
     val todaySteps by viewModel.todaySteps.collectAsStateWithLifecycle()
     val caloriesBurned by viewModel.caloriesBurned.collectAsStateWithLifecycle()
+    val fastingState by viewModel.fastingState.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -191,6 +192,16 @@ fun DashboardScreen(
                     caloriesBurned = caloriesBurned,
                     consumedCalories = displaySummary.caloriesConsumed,
                     onAddSteps = { viewModel.addManualSteps(it) }
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Intermittent Fasting Tracker
+                IntermittentFastingCard(
+                    fastingState = fastingState,
+                    onStartFast = { targetHours, startTimeMs -> viewModel.startFast(targetHours, startTimeMs) },
+                    onEndFast = { viewModel.endFast() },
+                    onUpdateTarget = { viewModel.updateFastingTarget(it) }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))

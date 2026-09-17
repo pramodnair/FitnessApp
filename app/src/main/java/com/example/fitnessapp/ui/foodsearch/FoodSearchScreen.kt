@@ -1,5 +1,10 @@
 package com.example.fitnessapp.ui.foodsearch
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -43,6 +48,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
@@ -130,6 +136,32 @@ fun FoodSearchScreen(
     var itemForCustomQty by remember { mutableStateOf<PlateItem?>(null) }
     var showSaveComboDialog by remember { mutableStateOf(false) }
     var comboNameInput by remember { mutableStateOf("") }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                viewModel.onSearchQueryChanged(spokenText)
+                viewModel.parseNaturalLanguageMeal(spokenText)
+            }
+        }
+    }
+
+    val launchVoiceInput = {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your meal (e.g. 2 rotis with dal tadka)...")
+            }
+            speechLauncher.launch(intent)
+        } catch (e: Exception) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Speech recognition not available on this device")
+            }
+        }
+    }
 
     LaunchedEffect(statusMessage) {
         statusMessage?.let {
@@ -222,9 +254,18 @@ fun FoodSearchScreen(
                                 Icon(Icons.Default.Search, contentDescription = null)
                             },
                             trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                        }
+                                    }
+                                    IconButton(onClick = { launchVoiceInput() }) {
+                                        Icon(
+                                            Icons.Default.Mic,
+                                            contentDescription = "Speak Meal",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
                                     }
                                 }
                             },
@@ -753,6 +794,19 @@ fun FoodSearchScreen(
                         maxLines = 3,
                         shape = RoundedCornerShape(12.dp)
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showSentenceParserDialog = false
+                            launchVoiceInput()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Speak Meal Naturally", fontSize = 12.sp)
+                    }
                 }
             },
             confirmButton = {

@@ -286,8 +286,20 @@ fun PartnerScreen(
                             Spacer(modifier = Modifier.width(14.dp))
 
                             Column {
+                                val u1 = duel.primaryUser
+                                val u2 = duel.partnerUser
+                                val isSynced = duel.isPartnerSynced
+
+                                var u1Wins = 0
+                                var u2Wins = 0
+                                if (u1.adherencePercent > u2.adherencePercent) u1Wins++ else if (u2.adherencePercent > u1.adherencePercent) u2Wins++
+                                if (u1.stepsTaken > u2.stepsTaken) u1Wins++ else if (u2.stepsTaken > u1.stepsTaken) u2Wins++
+                                val u1WaterRatio = if (u1.waterTargetMl > 0) u1.waterIntakeMl.toFloat() / u1.waterTargetMl else 0f
+                                val u2WaterRatio = if (u2.waterTargetMl > 0) u2.waterIntakeMl.toFloat() / u2.waterTargetMl else 0f
+                                if (u1WaterRatio > u2WaterRatio) u1Wins++ else if (u2WaterRatio > u1WaterRatio) u2Wins++
+
                                 Text(
-                                    text = "DAILY LEADERBOARD",
+                                    text = "DAILY 3-PILLAR LEADERBOARD",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -295,22 +307,24 @@ fun PartnerScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (duel.isPartnerSynced && duel.winnerName != null) {
-                                        "${duel.winnerName} is winning today! 🏆"
-                                    } else if (duel.isPartnerSynced) {
-                                        "It's a tie today! Keep pushing! 🔥"
+                                    text = if (!isSynced) {
+                                        "Today's Tri-Duel in Progress ⚔️"
+                                    } else if (u1Wins > u2Wins) {
+                                        "${u1.userName} leads 3-Pillar Duel ($u1Wins - $u2Wins)! 🏆"
+                                    } else if (u2Wins > u1Wins) {
+                                        "${u2.userName} leads 3-Pillar Duel ($u2Wins - $u1Wins)! 🏆"
                                     } else {
-                                        "Today's Duel in Progress ⚔️"
+                                        "Tied across fitness pillars! Keep pushing! 🔥"
                                     },
-                                    fontSize = 16.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (duel.isPartnerSynced) {
-                                        "Score based on calorie budget adherence & healthy hydration."
+                                    text = if (isSynced) {
+                                        "Pillars: Calories (${if (u1.adherencePercent > u2.adherencePercent) u1.userName else if (u2.adherencePercent > u1.adherencePercent) u2.userName else "Tie"}) • Steps (${if (u1.stepsTaken > u2.stepsTaken) u1.userName else if (u2.stepsTaken > u1.stepsTaken) u2.userName else "Tie"}) • Water (${if (u1WaterRatio > u2WaterRatio) u1.userName else if (u2WaterRatio > u1WaterRatio) u2.userName else "Tie"})"
                                     } else {
-                                        "Waiting for partner's Wi-Fi sync to compare scores."
+                                        "Waiting for partner's Wi-Fi sync to compare Calories, Steps & Water."
                                     },
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -369,6 +383,11 @@ fun PartnerScreen(
 
                     // Daily Steps Duel Battle Card
                     PartnerStepsBattleCard(duel = duel)
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Daily Hydration Duel Battle Card
+                    PartnerHydrationBattleCard(duel = duel)
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -1065,6 +1084,127 @@ private fun PartnerStepsBattleCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { if (isSynced) u2Progress else 0f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = Color(0xFFE91E63),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartnerHydrationBattleCard(
+    duel: PartnerDuelSummary,
+    modifier: Modifier = Modifier
+) {
+    val u1 = duel.primaryUser
+    val u2 = duel.partnerUser
+    val isSynced = duel.isPartnerSynced
+
+    val u1Progress = if (u1.waterTargetMl > 0) (u1.waterIntakeMl.toFloat() / u1.waterTargetMl.toFloat()).coerceIn(0f, 1.5f) else 0f
+    val u2Progress = if (u2.waterTargetMl > 0) (u2.waterIntakeMl.toFloat() / u2.waterTargetMl.toFloat()).coerceIn(0f, 1.5f) else 0f
+
+    val waterBlue = Color(0xFF0288D1)
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = waterBlue.copy(alpha = 0.15f),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.WaterDrop,
+                                contentDescription = null,
+                                tint = waterBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "DAILY HYDRATION DUEL 💧",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = waterBlue,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = if (isSynced) {
+                                when {
+                                    u1Progress > u2Progress -> "${u1.userName} leads at ${(u1Progress * 100).toInt()}% of goal! 🥇"
+                                    u2Progress > u1Progress -> "${u2.userName} leads at ${(u2Progress * 100).toInt()}% of goal! 🥇"
+                                    else -> "Tied at ${(u1Progress * 100).toInt()}% hydration!"
+                                }
+                            } else {
+                                "${u1.userName}: ${u1.waterIntakeMl} ml • Partner awaiting sync"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // User 1 Water Bar
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("${u1.userName} (You)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${u1.waterIntakeMl} / ${u1.waterTargetMl} ml (${(u1Progress * 100).toInt()}%)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { u1Progress.coerceAtMost(1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = waterBlue,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // User 2 Water Bar
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(u2.userName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (isSynced) "${u2.waterIntakeMl} / ${u2.waterTargetMl} ml (${(u2Progress * 100).toInt()}%)" else "Not synced yet",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { if (isSynced) u2Progress.coerceAtMost(1f) else 0f },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)

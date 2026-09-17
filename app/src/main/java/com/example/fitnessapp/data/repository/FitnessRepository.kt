@@ -6,6 +6,8 @@ import com.example.fitnessapp.data.model.BodyPhoto
 import com.example.fitnessapp.data.model.BodyPose
 import com.example.fitnessapp.data.model.DailyNutritionSummary
 import com.example.fitnessapp.data.model.DeficitLevel
+import com.example.fitnessapp.data.model.FastingProtocol
+import com.example.fitnessapp.data.model.FastingState
 import com.example.fitnessapp.data.model.Gender
 import com.example.fitnessapp.data.model.MealLog
 import com.example.fitnessapp.data.model.Micronutrients
@@ -40,6 +42,7 @@ interface FitnessRepository {
     val pairCode: StateFlow<String>
     val incomingCheer: StateFlow<String?>
     val hasCompletedOnboarding: StateFlow<Boolean>
+    val fastingState: StateFlow<FastingState>
 
     fun switchActiveProfile(userId: String)
     fun updateProfile(profile: UserProfile)
@@ -62,6 +65,9 @@ interface FitnessRepository {
     fun clearIncomingCheer()
     fun setOnboardingCompleted(completed: Boolean)
     fun setOnDataChangedListener(listener: () -> Unit)
+    fun startFast(targetHours: Int = 16, startTimeMs: Long = System.currentTimeMillis())
+    fun endFast()
+    fun updateFastingTarget(targetHours: Int)
 }
 
 class AppFitnessRepository(
@@ -121,6 +127,18 @@ class AppFitnessRepository(
     private val _hasCompletedOnboarding = MutableStateFlow(prefs.getBoolean("has_completed_onboarding", false))
     override val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
 
+    private fun loadFastingState(): FastingState {
+        val raw = prefs.getString("fasting_state_${activeUserId}", null) ?: return FastingState()
+        return try {
+            json.decodeFromString<FastingState>(raw)
+        } catch (e: Exception) {
+            FastingState()
+        }
+    }
+
+    private val _fastingState = MutableStateFlow(loadFastingState())
+    override val fastingState: StateFlow<FastingState> = _fastingState.asStateFlow()
+
     init {
         recalculateToday()
     }
@@ -139,6 +157,7 @@ class AppFitnessRepository(
         } else {
             target
         }
+        _fastingState.value = loadFastingState()
         recalculateToday()
     }
 
@@ -525,6 +544,41 @@ class AppFitnessRepository(
 
     override fun setOnDataChangedListener(listener: () -> Unit) {
         this.onDataChangedListener = listener
+    }
+
+    override fun startFast(targetHours: Int, startTimeMs: Long) {
+        val protocol = when (targetHours) {
+            14 -> FastingProtocol.GENTLE
+            16 -> FastingProtocol.LEAN_GAINS
+            18 -> FastingProtocol.INTENSE
+            20 -> FastingProtocol.WARRIOR
+            else -> FastingProtocol.CUSTOM
+        }
+        val newState = FastingState(
+            isFasting = true,
+            startTimeMs = startTimeMs,
+            targetHours = targetHours,
+            protocol = protocol
+        )
+        _fastingState.value = newState
+        prefs.edit().putString("fasting_state_${activeUserId}", json.encodeToString(newState)).apply()
+        onDataChangedListener?.invoke()
+    }
+
+    override fun endFast() {
+        val current = _fastingState.value
+        val newState = current.copy(isFasting = false)
+        _fastingState.value = newState
+        prefs.edit().putString("fasting_state_${activeUserId}", json.encodeToString(newState)).apply()
+        onDataChangedListener?.invoke()
+    }
+
+    override fun updateFastingTarget(targetHours: Int) {
+        val current = _fastingState.value
+        val newState = current.copy(targetHours = targetHours)
+        _fastingState.value = newState
+        prefs.edit().putString("fasting_state_${activeUserId}", json.encodeToString(newState)).apply()
+        onDataChangedListener?.invoke()
     }
 
     private fun createInitialSummary(): DailyNutritionSummary {
