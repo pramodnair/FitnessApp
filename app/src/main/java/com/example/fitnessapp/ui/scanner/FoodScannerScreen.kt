@@ -46,6 +46,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -83,6 +84,7 @@ import java.util.concurrent.Executors
 @Composable
 fun FoodScannerScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToBarcodeScan: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: FoodScannerViewModel = viewModel()
 ) {
@@ -148,6 +150,16 @@ fun FoodScannerScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
+                    if (onNavigateToBarcodeScan != null) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = onNavigateToBarcodeScan) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = "Scan Barcode",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -21,6 +21,9 @@ data class UserDailyScore(
     val fatTargetG: Float = 0f,
     val targetWeightKg: Float = 0f,
     val startWeightKg: Float = 0f,
+    val stepsTaken: Int = 0,
+    val stepsTarget: Int = 10000,
+    val caloriesBurned: Int = 0,
     val isLiveSynced: Boolean = false,
     val lastSyncTimestamp: Long = 0L
 ) {

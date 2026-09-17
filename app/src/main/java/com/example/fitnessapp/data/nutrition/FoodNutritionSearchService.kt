@@ -28,9 +28,49 @@ class FoodNutritionSearchService(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val cachedCustomFoods = mutableListOf<FoodItemDefinition>()
+    private val savedCombos = mutableListOf<SavedMealCombo>()
 
     init {
         loadCachedFoods()
+        loadSavedCombos()
+    }
+
+    private fun loadSavedCombos() {
+        try {
+            val jsonStr = prefs.getString("saved_meal_combos", null)
+            if (!jsonStr.isNullOrBlank()) {
+                val list = json.decodeFromString<List<SavedMealCombo>>(jsonStr)
+                savedCombos.clear()
+                savedCombos.addAll(list)
+            }
+        } catch (e: Exception) {
+            Log.e("FoodSearchService", "Error loading saved combos: ${e.message}")
+        }
+    }
+
+    fun getSavedCombos(): List<SavedMealCombo> = synchronized(savedCombos) { savedCombos.toList() }
+
+    @Synchronized
+    fun saveMealCombo(combo: SavedMealCombo) {
+        savedCombos.removeAll { it.id == combo.id || it.name.equals(combo.name, ignoreCase = true) }
+        savedCombos.add(0, combo)
+        try {
+            val serialized = json.encodeToString(savedCombos)
+            prefs.edit().putString("saved_meal_combos", serialized).apply()
+        } catch (e: Exception) {
+            Log.e("FoodSearchService", "Error saving meal combo: ${e.message}")
+        }
+    }
+
+    @Synchronized
+    fun deleteMealCombo(comboId: String) {
+        savedCombos.removeAll { it.id == comboId }
+        try {
+            val serialized = json.encodeToString(savedCombos)
+            prefs.edit().putString("saved_meal_combos", serialized).apply()
+        } catch (e: Exception) {
+            Log.e("FoodSearchService", "Error deleting meal combo: ${e.message}")
+        }
     }
 
     private fun loadCachedFoods() {

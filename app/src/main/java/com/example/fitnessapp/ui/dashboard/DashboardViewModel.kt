@@ -32,6 +32,17 @@ class DashboardViewModel(
     private val _selectedDate = MutableStateFlow(getTodayDate())
     val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
 
+    val todaySteps: StateFlow<Int> = FitnessApplication.instance.stepTrackerManager.todaySteps
+    val caloriesBurned: StateFlow<Int> = FitnessApplication.instance.stepTrackerManager.caloriesBurned
+
+    init {
+        FitnessApplication.instance.stepTrackerManager.updateUserWeight(activeProfile.value.currentWeightKg)
+    }
+
+    fun addManualSteps(count: Int) {
+        FitnessApplication.instance.stepTrackerManager.addManualSteps(count)
+    }
+
     fun getTodayDate(): String = dateFormat.format(Date())
 
     // Meals for the selected date

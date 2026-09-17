@@ -16,6 +16,12 @@ class FitnessApplication : Application() {
     lateinit var foodNutritionSearchService: com.example.fitnessapp.data.nutrition.FoodNutritionSearchService
         private set
 
+    lateinit var openFoodFactsService: com.example.fitnessapp.data.nutrition.OpenFoodFactsService
+        private set
+
+    lateinit var stepTrackerManager: com.example.fitnessapp.data.sensor.StepTrackerManager
+        private set
+
     lateinit var syncCoordinator: com.example.fitnessapp.data.sync.SyncCoordinator
         private set
 
@@ -25,6 +31,8 @@ class FitnessApplication : Application() {
         repository = AppFitnessRepository(this)
         geminiVisionService = GeminiVisionService()
         foodNutritionSearchService = com.example.fitnessapp.data.nutrition.FoodNutritionSearchService(this)
+        openFoodFactsService = com.example.fitnessapp.data.nutrition.OpenFoodFactsService()
+        stepTrackerManager = com.example.fitnessapp.data.sensor.StepTrackerManager(this)
         syncCoordinator = com.example.fitnessapp.data.sync.SyncCoordinator(this, repository)
         syncCoordinator.start()
     }

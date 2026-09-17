@@ -473,6 +473,17 @@ class AppFitnessRepository(
         val totalCarbs = userMeals.sumOf { it.carbsG.toDouble() }.toFloat()
         val totalFat = userMeals.sumOf { it.fatG.toDouble() }.toFloat()
 
+        val steps = try {
+            com.example.fitnessapp.FitnessApplication.instance.stepTrackerManager.todaySteps.value
+        } catch (e: Exception) {
+            0
+        }
+        val burned = try {
+            com.example.fitnessapp.FitnessApplication.instance.stepTrackerManager.caloriesBurned.value
+        } catch (e: Exception) {
+            0
+        }
+
         return UserDailyScore(
             userId = currentProfile.id,
             userName = currentProfile.name,
@@ -491,6 +502,9 @@ class AppFitnessRepository(
             fatTargetG = rec.fatGrams,
             targetWeightKg = currentProfile.targetWeightKg,
             startWeightKg = initialWeight,
+            stepsTaken = steps,
+            stepsTarget = 10000,
+            caloriesBurned = burned,
             isLiveSynced = true,
             lastSyncTimestamp = System.currentTimeMillis()
         )

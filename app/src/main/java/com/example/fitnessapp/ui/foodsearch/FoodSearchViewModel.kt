@@ -8,8 +8,11 @@ import com.example.fitnessapp.data.model.MealLog
 import com.example.fitnessapp.data.model.MealType
 import com.example.fitnessapp.data.model.Micronutrients
 import com.example.fitnessapp.data.model.UserProfile
+import com.example.fitnessapp.data.nutrition.FoodDatabase
 import com.example.fitnessapp.data.nutrition.FoodItemDefinition
 import com.example.fitnessapp.data.nutrition.FoodNutritionSearchService
+import com.example.fitnessapp.data.nutrition.SavedMealCombo
+import com.example.fitnessapp.data.nutrition.SavedComboItem
 import com.example.fitnessapp.data.repository.FitnessRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -107,6 +110,68 @@ class FoodSearchViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlateNutritionTotals())
 
+    private val _savedCombos = MutableStateFlow(searchService.getSavedCombos())
+    val savedCombos: StateFlow<List<SavedMealCombo>> = _savedCombos.asStateFlow()
+
+    private fun getYesterdayDate(): String {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+    }
+
+    val yesterdayMealsForSelectedType: StateFlow<List<MealLog>> = combine(
+        repository.allMeals,
+        _selectedMealType,
+        activeProfile
+    ) { meals, mealType, profile ->
+        val yesterday = getYesterdayDate()
+        meals.filter { it.userId == profile.id && it.date == yesterday && it.mealType == mealType }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val recentFoods: StateFlow<List<FoodItemDefinition>> = combine(
+        repository.allMeals,
+        activeProfile
+    ) { all, profile ->
+        val userMeals = all.filter { it.userId == profile.id }.take(30)
+        val seenNames = mutableSetOf<String>()
+        val result = mutableListOf<FoodItemDefinition>()
+
+        for (meal in userMeals) {
+            for (item in meal.items) {
+                val lower = item.name.lowercase().trim()
+                if (!seenNames.contains(lower)) {
+                    seenNames.add(lower)
+                    val found = FoodDatabase.preloadedFoods.find { it.name.equals(item.name, ignoreCase = true) }
+                    if (found != null) {
+                        result.add(found)
+                    } else {
+                        val portion = item.portionDescription.ifBlank { "1 serving" }
+                        result.add(
+                            FoodItemDefinition(
+                                id = UUID.randomUUID().toString(),
+                                name = item.name,
+                                category = "Recent",
+                                servingUnit = portion,
+                                servingSizeDescription = portion,
+                                baseQuantity = 1.0f,
+                                calories = item.calories,
+                                proteinG = item.proteinG,
+                                carbsG = item.carbsG,
+                                fatG = item.fatG,
+                                fiberG = item.micronutrients.fiberG,
+                                sugarG = item.micronutrients.sugarG,
+                                sodiumMg = item.micronutrients.sodiumMg,
+                                potassiumMg = item.micronutrients.potassiumMg,
+                                isCustomOrAi = true
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        result
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     init {
         refreshLocalSearch()
     }
@@ -140,8 +205,17 @@ class FoodSearchViewModel(
     }
 
     private fun refreshLocalSearch() {
-        val results = searchService.searchLocal(_searchQuery.value, _selectedCategory.value)
-        _searchResults.value = results
+        val category = _selectedCategory.value
+        val query = _searchQuery.value
+        if (category.equals("Recent", ignoreCase = true)) {
+            val recents = recentFoods.value
+            _searchResults.value = if (query.isBlank()) recents else recents.filter { it.name.contains(query, ignoreCase = true) }
+        } else if (category.equals("My Combos", ignoreCase = true)) {
+            _searchResults.value = emptyList()
+        } else {
+            val results = searchService.searchLocal(query, category)
+            _searchResults.value = results
+        }
     }
 
     fun searchWithGeminiAi() {
@@ -317,5 +391,98 @@ class FoodSearchViewModel(
         repository.addMeal(mealLog)
         clearPlate()
         onCompleted(count, totals.calories)
+    }
+
+    fun saveCurrentPlateAsCombo(name: String) {
+        val items = _plateItems.value
+        if (items.isEmpty()) {
+            _statusMessage.value = "Add foods to your plate before saving as a combo."
+            return
+        }
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) {
+            _statusMessage.value = "Please enter a name for this combo."
+            return
+        }
+        val totals = plateNutritionTotals.value
+        val comboItems = items.map {
+            val scaled = it.scaledFoodItem
+            SavedComboItem(
+                foodId = it.food.id,
+                foodName = it.food.name,
+                quantity = it.quantity,
+                servingUnit = it.food.servingUnit,
+                calories = scaled.calories,
+                proteinG = scaled.proteinG,
+                carbsG = scaled.carbsG,
+                fatG = scaled.fatG,
+                fiberG = scaled.micronutrients.fiberG,
+                sugarG = scaled.micronutrients.sugarG,
+                sodiumMg = scaled.micronutrients.sodiumMg,
+                potassiumMg = scaled.micronutrients.potassiumMg,
+                category = it.food.category
+            )
+        }
+        val combo = SavedMealCombo(
+            id = UUID.randomUUID().toString(),
+            name = cleanName,
+            items = comboItems,
+            totalCalories = totals.calories,
+            totalProtein = totals.proteinG,
+            totalCarbs = totals.carbsG,
+            totalFat = totals.fatG
+        )
+        searchService.saveMealCombo(combo)
+        _savedCombos.value = searchService.getSavedCombos()
+        _statusMessage.value = "Saved \"$cleanName\" as a meal combo!"
+    }
+
+    fun addComboToPlate(combo: SavedMealCombo) {
+        for (item in combo.items) {
+            val def = item.toFoodItemDefinition()
+            addToPlate(def, item.quantity)
+        }
+        _statusMessage.value = "Added \"${combo.name}\" to your plate!"
+    }
+
+    fun deleteCombo(comboId: String) {
+        searchService.deleteMealCombo(comboId)
+        _savedCombos.value = searchService.getSavedCombos()
+        _statusMessage.value = "Meal combo removed."
+    }
+
+    fun copyYesterdayMealsToPlate() {
+        val yesterdayMeals = yesterdayMealsForSelectedType.value
+        if (yesterdayMeals.isEmpty()) {
+            _statusMessage.value = "No meals found from yesterday for ${_selectedMealType.value.name.lowercase().replaceFirstChar { it.uppercase() }}."
+            return
+        }
+        var totalAdded = 0
+        for (meal in yesterdayMeals) {
+            for (foodItem in meal.items) {
+                val portion = foodItem.portionDescription.ifBlank { "1 serving" }
+                val def = FoodDatabase.preloadedFoods.find { it.name.equals(foodItem.name, ignoreCase = true) }
+                    ?: FoodItemDefinition(
+                        id = UUID.randomUUID().toString(),
+                        name = foodItem.name,
+                        category = "Other",
+                        servingUnit = portion,
+                        servingSizeDescription = portion,
+                        baseQuantity = 1.0f,
+                        calories = foodItem.calories,
+                        proteinG = foodItem.proteinG,
+                        carbsG = foodItem.carbsG,
+                        fatG = foodItem.fatG,
+                        fiberG = foodItem.micronutrients.fiberG,
+                        sugarG = foodItem.micronutrients.sugarG,
+                        sodiumMg = foodItem.micronutrients.sodiumMg,
+                        potassiumMg = foodItem.micronutrients.potassiumMg,
+                        isCustomOrAi = true
+                    )
+                addToPlate(def, 1.0f)
+                totalAdded++
+            }
+        }
+        _statusMessage.value = "Copied $totalAdded item(s) from yesterday into your plate!"
     }
 }

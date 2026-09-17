@@ -26,7 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
@@ -52,6 +54,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.fitnessapp.data.model.PartnerDuelSummary
 import com.example.fitnessapp.data.model.UserDailyScore
 import com.example.fitnessapp.data.sync.SyncConnectionStatus
 
@@ -361,7 +365,12 @@ fun PartnerScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Daily Steps Duel Battle Card
+                    PartnerStepsBattleCard(duel = duel)
+
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Weekly Trophy Stats
                     Card(
@@ -946,5 +955,124 @@ private fun DuelMetricRow(label: String, value: String) {
     ) {
         Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun PartnerStepsBattleCard(
+    duel: PartnerDuelSummary,
+    modifier: Modifier = Modifier
+) {
+    val u1 = duel.primaryUser
+    val u2 = duel.partnerUser
+    val isSynced = duel.isPartnerSynced
+
+    val u1Progress = (u1.stepsTaken.toFloat() / u1.stepsTarget.toFloat()).coerceIn(0f, 1f)
+    val u2Progress = (u2.stepsTaken.toFloat() / u2.stepsTarget.toFloat()).coerceIn(0f, 1f)
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF00B4D8).copy(alpha = 0.15f),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.DirectionsWalk,
+                                contentDescription = null,
+                                tint = Color(0xFF00B4D8),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "DAILY STEPS BATTLE 👟",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF00B4D8),
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = if (isSynced) {
+                                when {
+                                    u1.stepsTaken > u2.stepsTaken -> "${u1.userName} leads by ${u1.stepsTaken - u2.stepsTaken} steps! 🥇"
+                                    u2.stepsTaken > u1.stepsTaken -> "${u2.userName} leads by ${u2.stepsTaken - u1.stepsTaken} steps! 🥇"
+                                    else -> "Tied at ${u1.stepsTaken} steps!"
+                                }
+                            } else {
+                                "${u1.userName}: ${u1.stepsTaken} steps • Partner awaiting sync"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // User 1 Steps Bar
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("${u1.userName} (You)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${u1.stepsTaken} / ${u1.stepsTarget} • ${u1.caloriesBurned} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { u1Progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // User 2 Steps Bar
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(u2.userName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (isSynced) "${u2.stepsTaken} / ${u2.stepsTarget} • ${u2.caloriesBurned} kcal" else "Not synced yet",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { if (isSynced) u2Progress else 0f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = Color(0xFFE91E63),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
     }
 }

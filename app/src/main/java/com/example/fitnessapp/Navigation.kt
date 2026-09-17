@@ -30,6 +30,7 @@ import com.example.fitnessapp.ui.foodsearch.FoodSearchScreen
 import com.example.fitnessapp.ui.onboarding.OnboardingScreen
 import com.example.fitnessapp.ui.partner.PartnerScreen
 import com.example.fitnessapp.ui.profile.ProfileSetupScreen
+import com.example.fitnessapp.ui.scanner.BarcodeScannerScreen
 import com.example.fitnessapp.ui.scanner.FoodScannerScreen
 import com.example.fitnessapp.ui.scanner.ManualFoodEntryDialog
 import com.example.fitnessapp.ui.weight.WeightTrackerScreen
@@ -114,13 +115,25 @@ fun MainNavigation() {
 
             entry<ScannerNav> {
                 FoodScannerScreen(
-                    onNavigateBack = { backStack.removeLastOrNull() }
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                    onNavigateToBarcodeScan = { backStack.add(BarcodeScannerNav) }
+                )
+            }
+
+            entry<BarcodeScannerNav> {
+                BarcodeScannerScreen(
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                    onProductFound = { foodDef, qty ->
+                        FitnessApplication.instance.foodNutritionSearchService.saveCustomFood(foodDef)
+                        backStack.removeLastOrNull()
+                    }
                 )
             }
 
             entry<FoodSearchNav> {
                 FoodSearchScreen(
-                    onNavigateBack = { backStack.removeLastOrNull() }
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                    onNavigateToBarcodeScan = { backStack.add(BarcodeScannerNav) }
                 )
             }
 

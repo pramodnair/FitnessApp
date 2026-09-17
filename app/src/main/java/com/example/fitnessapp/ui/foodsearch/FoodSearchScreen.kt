@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
@@ -39,9 +42,12 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
+import com.example.fitnessapp.data.nutrition.SavedMealCombo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -98,6 +104,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun FoodSearchScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToBarcodeScan: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: FoodSearchViewModel = viewModel()
 ) {
@@ -109,6 +116,9 @@ fun FoodSearchScreen(
     val plateTotals by viewModel.plateNutritionTotals.collectAsStateWithLifecycle()
     val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
+    val recentFoods by viewModel.recentFoods.collectAsStateWithLifecycle()
+    val savedCombos by viewModel.savedCombos.collectAsStateWithLifecycle()
+    val yesterdayMeals by viewModel.yesterdayMealsForSelectedType.collectAsStateWithLifecycle()
 
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -118,6 +128,8 @@ fun FoodSearchScreen(
     var isPlateExpanded by remember { mutableStateOf(true) }
     var showSentenceParserDialog by remember { mutableStateOf(false) }
     var itemForCustomQty by remember { mutableStateOf<PlateItem?>(null) }
+    var showSaveComboDialog by remember { mutableStateOf(false) }
+    var comboNameInput by remember { mutableStateOf("") }
 
     LaunchedEffect(statusMessage) {
         statusMessage?.let {
@@ -226,6 +238,21 @@ fun FoodSearchScreen(
                             )
                         )
 
+                        // Barcode Scanner Button
+                        IconButton(
+                            onClick = onNavigateToBarcodeScan,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        ) {
+                            Icon(
+                                Icons.Default.QrCodeScanner,
+                                contentDescription = "Scan Barcode",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+
                         // AI Sentence Parser Button
                         IconButton(
                             onClick = { showSentenceParserDialog = true },
@@ -247,22 +274,78 @@ fun FoodSearchScreen(
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
 
+                    // Copy Yesterday's Meal Banner (if available for selected meal type)
+                    if (yesterdayMeals.isNotEmpty()) {
+                        val yesterdayItemCount = yesterdayMeals.sumOf { it.items.size }
+                        val yesterdayCalories = yesterdayMeals.sumOf { it.calories }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Yesterday's ${selectedMealType.label}: $yesterdayItemCount items ($yesterdayCalories kcal)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Button(
+                                    onClick = { viewModel.copyYesterdayMealsToPlate() },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Text("Copy to Plate", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Categories Horizontal Row
                     val scrollState = rememberScrollState()
+                    val allCategories = remember {
+                        listOf("All", "⚡ Recent", "🍱 My Combos") + FoodDatabase.categories.filter { it != "All" }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(scrollState),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        FoodDatabase.categories.forEach { category ->
+                        allCategories.forEach { category ->
                             val isSelected = selectedCategory.equals(category, ignoreCase = true)
+                            val countBadge = when (category) {
+                                "⚡ Recent" -> if (recentFoods.isNotEmpty()) " (${recentFoods.size})" else ""
+                                "🍱 My Combos" -> if (savedCombos.isNotEmpty()) " (${savedCombos.size})" else ""
+                                else -> ""
+                            }
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { viewModel.onCategorySelected(category) },
-                                label = { Text(category, fontSize = 12.sp) },
+                                label = { Text("$category$countBadge", fontSize = 12.sp) },
                                 shape = RoundedCornerShape(20.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -321,11 +404,28 @@ fun FoodSearchScreen(
                                 )
                             }
 
-                            TextButton(
-                                onClick = { viewModel.clearPlate() },
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text("Clear", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        comboNameInput = ""
+                                        showSaveComboDialog = true
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.BookmarkAdd,
+                                        contentDescription = "Save as Combo",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                TextButton(
+                                    onClick = { viewModel.clearPlate() },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("Clear", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
 
@@ -409,25 +509,81 @@ fun FoodSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
+                    val countText = when (selectedCategory) {
+                        "🍱 My Combos" -> "${savedCombos.size} combos"
+                        "⚡ Recent" -> "${searchResults.size} items"
+                        else -> "${searchResults.size} items"
+                    }
+                    val titleText = when (selectedCategory) {
+                        "🍱 My Combos" -> "My Saved Combos"
+                        "⚡ Recent" -> "Recently Logged Foods"
+                        else -> if (searchQuery.isBlank()) "Popular $selectedCategory Foods" else "Results for \"$searchQuery\""
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (searchQuery.isBlank()) "Popular $selectedCategory Foods" else "Results for \"$searchQuery\"",
+                            text = titleText,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "${searchResults.size} items",
+                            text = countText,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                if (searchResults.isEmpty()) {
+                if (selectedCategory == "🍱 My Combos") {
+                    if (savedCombos.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        Icons.Default.Bookmark,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(40.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "No Saved Combos Yet",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Build a plate with multiple foods (e.g. 2 Rotis + Dal + Salad) and tap the bookmark icon on your plate to save it as a 1-tap reusable combo!",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        items(savedCombos, key = { it.id }) { combo ->
+                            SavedMealComboCard(
+                                combo = combo,
+                                onAdd = { viewModel.addComboToPlate(combo) },
+                                onDelete = { viewModel.deleteCombo(combo.id) }
+                            )
+                        }
+                    }
+                } else if (searchResults.isEmpty()) {
                     item {
                         Card(
                             modifier = Modifier
@@ -449,27 +605,30 @@ fun FoodSearchScreen(
                                 )
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    text = "No local matches for \"$searchQuery\"",
+                                    text = if (selectedCategory == "⚡ Recent") "No recent foods yet" else "No local matches for \"$searchQuery\"",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Search online using Gemini AI to fetch nutrition info and save it to your database.",
+                                    text = if (selectedCategory == "⚡ Recent") "Foods you log will automatically appear here for fast 1-tap re-logging."
+                                    else "Search online using Gemini AI to fetch nutrition info and save it to your database.",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
                                 )
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Button(
-                                    onClick = { viewModel.searchWithGeminiAi() },
-                                    enabled = !isAiLoading,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Search Online with Gemini AI", fontSize = 13.sp)
+                                if (selectedCategory != "⚡ Recent") {
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Button(
+                                        onClick = { viewModel.searchWithGeminiAi() },
+                                        enabled = !isAiLoading,
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Search Online with Gemini AI", fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }
@@ -570,6 +729,49 @@ fun FoodSearchScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSentenceParserDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Save Plate as Combo Dialog
+    if (showSaveComboDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveComboDialog = false },
+            icon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Save as Meal Combo", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        text = "Save this plate (${plateItems.size} items • ${plateTotals.calories} kcal) as a reusable combo for 1-tap logging.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = comboNameInput,
+                        onValueChange = { comboNameInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. Daily Lunch Thali, Post-Workout Shake") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.saveCurrentPlateAsCombo(comboNameInput)
+                        showSaveComboDialog = false
+                    },
+                    enabled = comboNameInput.isNotBlank()
+                ) {
+                    Text("Save Combo")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveComboDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -836,5 +1038,107 @@ private fun MacroChip(label: String, isPrimary: Boolean = false, color: Color? =
             fontWeight = FontWeight.Bold,
             color = if (isPrimary) MaterialTheme.colorScheme.primary else (color ?: MaterialTheme.colorScheme.onSurfaceVariant)
         )
+    }
+}
+
+@Composable
+private fun SavedMealComboCard(
+    combo: SavedMealCombo,
+    onAdd: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Bookmark,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = combo.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${combo.items.size} items • ${combo.totalCalories} kcal",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Combo",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Button(
+                        onClick = onAdd,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val itemsSummary = combo.items.joinToString(", ") {
+                val qtyStr = if (it.quantity % 1f == 0f) it.quantity.toInt().toString() else "%.1f".format(it.quantity)
+                "$qtyStr ${it.foodName}"
+            }
+            Text(
+                text = itemsSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MacroChip("P: ${combo.totalProtein}g", color = Color(0xFF64B5F6))
+                MacroChip("C: ${combo.totalCarbs}g", color = Color(0xFF81C784))
+                MacroChip("F: ${combo.totalFat}g", color = Color(0xFFFFB74D))
+            }
+        }
     }
 }
