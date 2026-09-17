@@ -458,20 +458,38 @@ class FoodSearchViewModel(
     fun copyYesterdayMealsToPlate() {
         val yesterdayMeals = yesterdayMealsForSelectedType.value
         if (yesterdayMeals.isEmpty()) {
-            _statusMessage.value = "No meals found from yesterday for ${_selectedMealType.value.name.lowercase().replaceFirstChar { it.uppercase() }}."
+            _statusMessage.value = "No meals found from yesterday for ${_selectedMealType.value.label}."
             return
         }
         var totalAdded = 0
         for (meal in yesterdayMeals) {
             for (foodItem in meal.items) {
-                val portion = foodItem.portionDescription.ifBlank { "1 serving" }
-                val def = FoodDatabase.preloadedFoods.find { it.name.equals(foodItem.name, ignoreCase = true) }
+                val cleanName = foodItem.name.removePrefix("Indian Meal: ").trim()
+                val rawPortion = foodItem.portionDescription.ifBlank { "1 serving" }
+                val lowerPortion = rawPortion.lowercase()
+                val cleanUnit = when {
+                    lowerPortion.contains("plate") -> "plate"
+                    lowerPortion.contains("katori") -> "katori"
+                    lowerPortion.contains("bowl") -> "bowl"
+                    lowerPortion.contains("cup") -> "cup"
+                    lowerPortion.contains("piece") || lowerPortion.contains("pcs") || lowerPortion.contains("pc") -> "piece"
+                    lowerPortion.contains("roti") || lowerPortion.contains("chapati") -> "roti"
+                    lowerPortion.contains("glass") -> "glass"
+                    lowerPortion.contains("tbsp") -> "tbsp"
+                    lowerPortion.contains("tsp") -> "tsp"
+                    lowerPortion.length <= 12 && !lowerPortion.contains(" ") -> lowerPortion
+                    else -> "serving"
+                }
+                val shortDesc = if (rawPortion.length > 45) rawPortion.take(45).trim() + "..." else rawPortion
+                val stableId = "yesterday_${cleanName.lowercase().replace(Regex("[^a-z0-9]"), "_")}"
+
+                val def = FoodDatabase.preloadedFoods.find { it.name.equals(cleanName, ignoreCase = true) || it.name.equals(foodItem.name, ignoreCase = true) }
                     ?: FoodItemDefinition(
-                        id = UUID.randomUUID().toString(),
-                        name = foodItem.name,
-                        category = "Other",
-                        servingUnit = portion,
-                        servingSizeDescription = portion,
+                        id = stableId,
+                        name = cleanName,
+                        category = "Yesterday",
+                        servingUnit = cleanUnit,
+                        servingSizeDescription = shortDesc,
                         baseQuantity = 1.0f,
                         calories = foodItem.calories,
                         proteinG = foodItem.proteinG,
@@ -487,6 +505,7 @@ class FoodSearchViewModel(
                 totalAdded++
             }
         }
-        _statusMessage.value = "Copied $totalAdded item(s) from yesterday into your plate!"
+        val itemsGrammar = if (totalAdded == 1) "1 item" else "$totalAdded items"
+        _statusMessage.value = "Copied $itemsGrammar from yesterday into your plate!"
     }
 }

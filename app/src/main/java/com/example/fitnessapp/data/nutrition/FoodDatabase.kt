@@ -23,12 +23,33 @@ data class FoodItemDefinition(
     val potassiumMg: Float = 0f,
     val isCustomOrAi: Boolean = false
 ) {
+    val cleanServingUnit: String
+        get() {
+            val lower = servingUnit.trim().lowercase()
+            return when {
+                lower.contains("plate") -> "plate"
+                lower.contains("katori") -> "katori"
+                lower.contains("bowl") -> "bowl"
+                lower.contains("cup") -> "cup"
+                lower.contains("piece") || lower.contains("pcs") || lower.contains("pc") -> "piece"
+                lower.contains("roti") || lower.contains("chapati") -> "roti"
+                lower.contains("glass") -> "glass"
+                lower.contains("tbsp") -> "tbsp"
+                lower.contains("tsp") -> "tsp"
+                lower.contains("scoop") -> "scoop"
+                lower.contains("gram") || lower == "g" -> "g"
+                lower.length <= 12 && !lower.contains(" ") -> lower
+                else -> "serving"
+            }
+        }
+
     fun scale(quantity: Float): FoodItem {
         val factor = if (baseQuantity > 0f) quantity / baseQuantity else quantity
         val qtyDisplay = if (quantity % 1f == 0f) quantity.toInt().toString() else "%.1f".format(quantity)
+        val shortDesc = if (servingSizeDescription.length > 40) servingSizeDescription.take(40).trim() + "..." else servingSizeDescription
         return FoodItem(
             name = name,
-            portionDescription = "$qtyDisplay $servingUnit ($servingSizeDescription)",
+            portionDescription = "$qtyDisplay $cleanServingUnit ($shortDesc)",
             calories = (calories * factor).toInt().coerceAtLeast(0),
             proteinG = ((proteinG * factor * 10f).toInt() / 10f).coerceAtLeast(0f),
             carbsG = ((carbsG * factor * 10f).toInt() / 10f).coerceAtLeast(0f),

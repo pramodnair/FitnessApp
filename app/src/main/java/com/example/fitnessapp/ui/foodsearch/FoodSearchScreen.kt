@@ -278,11 +278,18 @@ fun FoodSearchScreen(
                     if (yesterdayMeals.isNotEmpty()) {
                         val yesterdayItemCount = yesterdayMeals.sumOf { it.items.size }
                         val yesterdayCalories = yesterdayMeals.sumOf { it.calories }
+                        val itemsText = if (yesterdayItemCount == 1) "1 item" else "$yesterdayItemCount items"
+                        val isAlreadyCopied = plateItems.isNotEmpty() && yesterdayMeals.flatMap { it.items }.any { yItem ->
+                            val cleanY = yItem.name.removePrefix("Indian Meal: ").trim()
+                            plateItems.any { p -> p.food.name.equals(cleanY, ignoreCase = true) || p.food.name.equals(yItem.name, ignoreCase = true) }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                            color = if (isAlreadyCopied) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, if (isAlreadyCopied) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -295,28 +302,38 @@ fun FoodSearchScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(
-                                        Icons.Default.History,
+                                        imageVector = if (isAlreadyCopied) Icons.Default.Check else Icons.Default.History,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.size(18.dp)
+                                        tint = if (isAlreadyCopied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Yesterday's ${selectedMealType.label}: $yesterdayItemCount items ($yesterdayCalories kcal)",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Yesterday's ${selectedMealType.label}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "$itemsText • $yesterdayCalories kcal",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                                 Button(
                                     onClick = { viewModel.copyYesterdayMealsToPlate() },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(30.dp)
+                                    colors = if (isAlreadyCopied) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors(),
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("Copy to Plate", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = if (isAlreadyCopied) "Add Again" else "Copy to Plate",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -391,7 +408,7 @@ fun FoodSearchScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Your Plate (${plateTotals.itemCount} items)",
+                                    text = "Your Plate (${plateTotals.itemCount} ${if (plateTotals.itemCount == 1) "item" else "items"})",
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -802,31 +819,202 @@ fun FoodSearchScreen(
 
     // Custom Quantity Stepper / Direct Input Dialog
     itemForCustomQty?.let { item ->
-        var qtyText by remember {
+        val cleanUnit = item.food.cleanServingUnit
+        var qtyText by remember(item) {
             mutableStateOf(
                 if (item.quantity % 1f == 0f) item.quantity.toInt().toString() else "%.1f".format(item.quantity)
             )
         }
+        val currentQty = qtyText.toFloatOrNull() ?: 0f
+        val previewCals = (item.food.calories * currentQty).toInt()
+        val previewProtein = ((item.food.proteinG * currentQty * 10).toInt()) / 10f
+        val previewCarbs = ((item.food.carbsG * currentQty * 10).toInt()) / 10f
+        val previewFat = ((item.food.fatG * currentQty * 10).toInt()) / 10f
+
         AlertDialog(
             onDismissRequest = { itemForCustomQty = null },
-            title = { Text("Adjust Quantity", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text(
-                        text = "${item.food.name} (${item.food.servingSizeDescription})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Adjust Portion", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = item.food.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (item.food.servingSizeDescription.isNotBlank()) {
+                        Text(
+                            text = "Base serving: ${item.food.servingSizeDescription}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Stepper Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(
+                            onClick = {
+                                val current = qtyText.toFloatOrNull() ?: 1f
+                                val next = (current - 0.5f).coerceAtLeast(0.5f)
+                                qtyText = if (next % 1f == 0f) next.toInt().toString() else "%.1f".format(next)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${qtyText.ifBlank { "0" }} $cleanUnit",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "serving count",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val current = qtyText.toFloatOrNull() ?: 1f
+                                val next = current + 0.5f
+                                qtyText = if (next % 1f == 0f) next.toInt().toString() else "%.1f".format(next)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Increase")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Preset Multiplier Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(0.5f, 1.0f, 1.5f, 2.0f, 3.0f).forEach { preset ->
+                            val label = if (preset % 1f == 0f) "${preset.toInt()}x" else "${preset}x"
+                            val isSelected = (qtyText.toFloatOrNull() ?: -1f) == preset
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        qtyText = if (preset % 1f == 0f) preset.toInt().toString() else "%.1f".format(preset)
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Direct Input TextField with clean unit label
                     OutlinedTextField(
                         value = qtyText,
                         onValueChange = { qtyText = it },
-                        label = { Text("Quantity in ${item.food.servingUnit}") },
+                        label = { Text("Exact Quantity ($cleanUnit)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Live Scaled Nutrition Card
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "$previewCals",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("kcal", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${previewProtein}g",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF2E7D32)
+                                )
+                                Text("Protein", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${previewCarbs}g",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFE65100)
+                                )
+                                Text("Carbs", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${previewFat}g",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFC2185B)
+                                )
+                                Text("Fat", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -837,9 +1025,10 @@ fun FoodSearchScreen(
                             viewModel.updatePlateItemQuantity(item.food.id, parsed)
                         }
                         itemForCustomQty = null
-                    }
+                    },
+                    enabled = (qtyText.toFloatOrNull() ?: 0f) > 0f
                 ) {
-                    Text("Update")
+                    Text("Update Plate")
                 }
             },
             dismissButton = {
@@ -1010,14 +1199,28 @@ private fun PlateItemRow(
                 Icon(Icons.Default.Remove, contentDescription = "Minus", modifier = Modifier.size(14.dp))
             }
 
-            Text(
-                text = "$qtyStr ${plateItem.food.servingUnit}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
                     .clickable { onCustomQtyClick() }
-                    .padding(horizontal = 6.dp)
-            )
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$qtyStr ${plateItem.food.cleanServingUnit}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Edit quantity",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
 
             IconButton(onClick = onIncrement, modifier = Modifier.size(26.dp)) {
                 Icon(Icons.Default.Add, contentDescription = "Plus", modifier = Modifier.size(14.dp))
