@@ -38,6 +38,7 @@ data class UserProfile(
     val deficitLevel: DeficitLevel = DeficitLevel.MODERATE,
     val customDeficitKcal: Int = 500,
     val dailyWaterTargetMl: Int = 3000,
+    val dailyStepTarget: Int = 10000,
     val targetBmi: Float = 22.0f,
     val autoCalculateTargetFromBmi: Boolean = true,
     val geminiApiKey: String = "",

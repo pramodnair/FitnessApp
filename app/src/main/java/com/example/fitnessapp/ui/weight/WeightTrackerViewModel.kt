@@ -27,4 +27,13 @@ class WeightTrackerViewModel(
     fun updateStartingWeight(weightKg: Float) {
         repository.updateStartingWeight(weightKg)
     }
+
+    fun deleteWeightEntry(logId: String) {
+        repository.deleteWeightLog(logId)
+    }
+
+    fun editWeightEntry(logId: String, weightKg: Float, notes: String = "") {
+        repository.editWeightLog(logId, weightKg, notes)
+    }
 }
+

@@ -1,6 +1,8 @@
 package com.example.fitnessapp.ui.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -105,6 +109,8 @@ fun ProfileSetupScreen(
     var apiKey by remember(profile) { mutableStateOf(profile.geminiApiKey) }
     var selectedTargetBmi by remember(profile) { mutableStateOf(profile.targetBmi) }
     var autoCalculateTarget by remember(profile) { mutableStateOf(profile.autoCalculateTargetFromBmi) }
+    var dailyStepTargetText by remember(profile) { mutableStateOf(profile.dailyStepTarget.toString()) }
+    var dailyWaterTargetText by remember(profile) { mutableStateOf(profile.dailyWaterTargetMl.toString()) }
 
     // API Key test state
     var isTestingApiKey by remember { mutableStateOf(false) }
@@ -439,6 +445,125 @@ fun ProfileSetupScreen(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Daily Lifestyle & Activity Targets Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DirectionsWalk, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Daily Activity & Hydration Targets", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Set your daily step goal and target water intake for personalized progress tracking.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Daily Step Goal
+                    Text(
+                        text = "DAILY STEP GOAL",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.outline,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = dailyStepTargetText,
+                        onValueChange = { dailyStepTargetText = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Daily Step Target") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(6000, 8000, 10000, 12000).forEach { steps ->
+                            val isSel = dailyStepTargetText == steps.toString()
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSel) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    )
+                                    .clickable { dailyStepTargetText = steps.toString() }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${steps / 1000}k",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Daily Water Intake Target
+                    Text(
+                        text = "DAILY WATER TARGET (ML)",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.outline,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = dailyWaterTargetText,
+                        onValueChange = { dailyWaterTargetText = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Daily Water Target (ml)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(2000, 2500, 3000, 3500).forEach { ml ->
+                            val isSel = dailyWaterTargetText == ml.toString()
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSel) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    )
+                                    .clickable { dailyWaterTargetText = ml.toString() }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${ml / 1000}.${(ml % 1000) / 100}L".replace(".0L", "L"),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -857,7 +982,9 @@ fun ProfileSetupScreen(
                         activityLevel = activityLevel,
                         deficitLevel = deficitLevel,
                         customDeficitKcal = customDeficitText.toIntOrNull() ?: profile.customDeficitKcal,
-                        geminiApiKey = apiKey.trim()
+                        geminiApiKey = apiKey.trim(),
+                        dailyStepTarget = dailyStepTargetText.toIntOrNull()?.coerceIn(1000, 50000) ?: profile.dailyStepTarget,
+                        dailyWaterTargetMl = dailyWaterTargetText.toIntOrNull()?.coerceIn(1000, 8000) ?: profile.dailyWaterTargetMl
                     )
                     viewModel.saveProfile(updated)
                     scope.launch {

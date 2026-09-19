@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -89,6 +90,10 @@ fun DashboardScreen(
     val todaySteps by viewModel.todaySteps.collectAsStateWithLifecycle()
     val caloriesBurned by viewModel.caloriesBurned.collectAsStateWithLifecycle()
     val fastingState by viewModel.fastingState.collectAsStateWithLifecycle()
+    val weeklySummary by viewModel.weeklySummary.collectAsStateWithLifecycle()
+    val loggingStreak by viewModel.loggingStreak.collectAsStateWithLifecycle()
+
+    var showQuickCalorieDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -114,6 +119,7 @@ fun DashboardScreen(
                 activeProfile = activeProfile,
                 partnerName = partnerDuel.partnerUser.userName.ifBlank { partnerProfile.name.ifBlank { "Partner" } },
                 isPartnerSynced = partnerDuel.isPartnerSynced,
+                streakDays = loggingStreak,
                 onNavigateToPartner = onNavigateToPartner,
                 onOpenSettings = onNavigateToSettings
             )
@@ -143,33 +149,51 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // 7-Day Weekly Deficit Rollup Card
+                WeeklyDeficitCard(summary = weeklySummary)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Quick Action Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
                         onClick = onNavigateToScanner,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        ),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                     ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("AI Food Scan", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("AI Scan", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
 
                     OutlinedButton(
                         onClick = onNavigateToFoodSearch,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                     ) {
-                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Search & Add", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Search", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+
+                    OutlinedButton(
+                        onClick = { showQuickCalorieDialog = true },
+                        modifier = Modifier.weight(1.1f),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+ Quick Cal", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
 
@@ -192,7 +216,7 @@ fun DashboardScreen(
                 // Daily Steps & Activity Tracker
                 DailyStepsCard(
                     steps = todaySteps,
-                    targetSteps = 10000,
+                    targetSteps = activeProfile.dailyStepTarget,
                     caloriesBurned = caloriesBurned,
                     consumedCalories = displaySummary.caloriesConsumed,
                     onAddSteps = { viewModel.addManualSteps(it) }
@@ -213,11 +237,22 @@ fun DashboardScreen(
                 // Meals Log for the Selected Date
                 MealListCard(
                     meals = displayMeals,
-                    onDeleteMeal = { viewModel.deleteMeal(it) }
+                    onDeleteMeal = { viewModel.deleteMeal(it) },
+                    onRepeatMeal = { viewModel.repeatMealToToday(it) }
                 )
 
                 Spacer(modifier = Modifier.height(80.dp)) // Padding for FAB
             }
+        }
+
+        if (showQuickCalorieDialog) {
+            QuickCalorieDialog(
+                onConfirm = { calories, mealType, note ->
+                    viewModel.logQuickCalories(calories, mealType, note)
+                    showQuickCalorieDialog = false
+                },
+                onDismiss = { showQuickCalorieDialog = false }
+            )
         }
     }
 }

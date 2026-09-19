@@ -63,8 +63,8 @@ object NutritionEngine {
         val remainingCalories = (dailyBudget - (proteinCalories + fatCalories)).coerceAtLeast(200f)
         val carbsGrams = remainingCalories / 4f
 
-        // Hydration recommendation: ~35ml per kg of body weight
-        val waterMl = (profile.currentWeightKg * 35f).roundToInt().coerceIn(2200, 4500)
+        // Hydration recommendation: user-specified target or ~35ml per kg of body weight
+        val waterMl = if (profile.dailyWaterTargetMl > 0) profile.dailyWaterTargetMl else (profile.currentWeightKg * 35f).roundToInt().coerceIn(2200, 4500)
 
         // Micronutrients baseline for healthy body maintenance
         val micros = Micronutrients.DAILY_RECOMMENDED.copy(

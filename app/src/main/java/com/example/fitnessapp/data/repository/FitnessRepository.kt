@@ -27,9 +27,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
+import com.example.fitnessapp.data.model.DayDeficitStatus
+import com.example.fitnessapp.data.model.WeeklyNutritionSummary
 
 interface FitnessRepository {
     val activeProfile: StateFlow<UserProfile>
@@ -54,6 +58,11 @@ interface FitnessRepository {
     fun getSummaryForDate(date: String): DailyNutritionSummary
     fun addWaterForDate(amountMl: Int, date: String)
     fun addWeightLog(weightKg: Float, notes: String = "")
+    fun deleteWeightLog(logId: String)
+    fun editWeightLog(logId: String, newWeightKg: Float, notes: String)
+    fun repeatMealToday(meal: MealLog): MealLog
+    fun calculateLoggingStreak(): Int
+    fun getWeeklyNutritionSummary(endDateStr: String? = null): WeeklyNutritionSummary
     fun updateStartingWeight(weightKg: Float)
     fun addBodyPhoto(photoPath: String, pose: BodyPose, weightKg: Float, notes: String = "")
     fun addWater(amountMl: Int)
@@ -394,6 +403,174 @@ class AppFitnessRepository(
         _weightLogs.value = list
         saveWeightLogs(list)
         onDataChangedListener?.invoke()
+    }
+
+    override fun deleteWeightLog(logId: String) {
+        val currentProfile = _activeProfile.value
+        val list = _weightLogs.value.toMutableList()
+        val itemToRemove = list.find { it.id == logId && it.userId == currentProfile.id } ?: return
+        list.remove(itemToRemove)
+        _weightLogs.value = list
+        saveWeightLogs(list)
+
+        // If the deleted item was the latest weight log, update currentWeightKg to the latest remaining log
+        val remainingUserLogs = list.filter { it.userId == currentProfile.id }.sortedByDescending { it.date }
+        val latestLog = remainingUserLogs.firstOrNull()
+        if (latestLog != null) {
+            updateProfile(currentProfile.copy(currentWeightKg = latestLog.weightKg))
+        } else {
+            updateProfile(currentProfile.copy(currentWeightKg = currentProfile.startWeightKg))
+        }
+        onDataChangedListener?.invoke()
+    }
+
+    override fun editWeightLog(logId: String, newWeightKg: Float, notes: String) {
+        val currentProfile = _activeProfile.value
+        val list = _weightLogs.value.toMutableList()
+        val index = list.indexOfFirst { it.id == logId && it.userId == currentProfile.id }
+        if (index >= 0) {
+            val old = list[index]
+            val newBmi = BmiCalculator.calculateBmi(newWeightKg, currentProfile.heightCm)
+            val updated = old.copy(weightKg = newWeightKg, bmi = newBmi, notes = notes)
+            list[index] = updated
+            _weightLogs.value = list
+            saveWeightLogs(list)
+
+            // If this was the most recent log, update profile current weight
+            val remainingUserLogs = list.filter { it.userId == currentProfile.id }.sortedByDescending { it.date }
+            if (remainingUserLogs.firstOrNull()?.id == logId) {
+                updateProfile(currentProfile.copy(currentWeightKg = newWeightKg))
+            }
+            onDataChangedListener?.invoke()
+        }
+    }
+
+    override fun repeatMealToday(meal: MealLog): MealLog {
+        val today = getTodayDate()
+        val currentProfile = _activeProfile.value
+        val newMeal = meal.copy(
+            id = UUID.randomUUID().toString(),
+            userId = currentProfile.id,
+            date = today,
+            timestamp = System.currentTimeMillis()
+        )
+        addMeal(newMeal)
+        return newMeal
+    }
+
+    override fun calculateLoggingStreak(): Int {
+        val currentProfile = _activeProfile.value
+        val userMeals = _meals.value.filter { it.userId == currentProfile.id }
+        if (userMeals.isEmpty()) return 0
+
+        val loggedDates = userMeals.map { it.date }.toSet()
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val cal = Calendar.getInstance()
+
+        val todayStr = sdf.format(cal.time)
+        val hasLoggedToday = loggedDates.contains(todayStr)
+        if (!hasLoggedToday) {
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+            val yesterdayStr = sdf.format(cal.time)
+            if (!loggedDates.contains(yesterdayStr)) {
+                return 0
+            }
+        }
+
+        var streak = 0
+        while (true) {
+            val dateStr = sdf.format(cal.time)
+            if (loggedDates.contains(dateStr)) {
+                streak++
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+            } else {
+                break
+            }
+        }
+        return streak
+    }
+
+    override fun getWeeklyNutritionSummary(endDateStr: String?): WeeklyNutritionSummary {
+        val targetEndDate = endDateStr ?: getTodayDate()
+        val currentProfile = _activeProfile.value
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
+        val cal = Calendar.getInstance()
+        try {
+            val parsed = sdf.parse(targetEndDate)
+            if (parsed != null) cal.time = parsed
+        } catch (_: Exception) {}
+
+        // 7 days ending on targetEndDate
+        val dayList = mutableListOf<String>()
+        val calIter = cal.clone() as Calendar
+        calIter.add(Calendar.DAY_OF_YEAR, -6)
+        val startDateStr = sdf.format(calIter.time)
+
+        for (i in 0..6) {
+            dayList.add(sdf.format(calIter.time))
+            calIter.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        var totalConsumed = 0
+        var totalBudget = 0
+        var daysOnTarget = 0
+        var daysWithLogs = 0
+        val dayStatuses = mutableListOf<DayDeficitStatus>()
+
+        val todayDate = sdf.format(Date())
+        val rec = NutritionEngine.calculateRecommendations(currentProfile)
+        val dailyBudget = rec.dailyCalorieBudget
+
+        for (d in dayList) {
+            val summary = getSummaryForDate(d)
+            val hasLogs = summary.caloriesConsumed > 0
+            if (hasLogs) daysWithLogs++
+
+            totalConsumed += summary.caloriesConsumed
+            totalBudget += summary.calorieBudget
+
+            val withinBudget = summary.caloriesConsumed <= summary.calorieBudget && hasLogs
+            if (withinBudget) daysOnTarget++
+
+            var label = d
+            try {
+                val dt = sdf.parse(d)
+                if (dt != null) label = dayFormat.format(dt)
+            } catch (_: Exception) {}
+
+            val isFuture = d > todayDate
+
+            dayStatuses.add(
+                DayDeficitStatus(
+                    dateStr = d,
+                    dayLabel = label,
+                    caloriesConsumed = summary.caloriesConsumed,
+                    calorieBudget = summary.calorieBudget,
+                    isWithinBudget = withinBudget,
+                    hasLogs = hasLogs,
+                    isFuture = isFuture
+                )
+            )
+        }
+
+        val avgConsumed = if (daysWithLogs > 0) totalConsumed / daysWithLogs else (totalConsumed / 7)
+        val netDeficitKcal = totalBudget - totalConsumed
+        val estimatedKgLost = if (netDeficitKcal > 0) (netDeficitKcal.toFloat() / 7700f) else 0f
+
+        return WeeklyNutritionSummary(
+            startDateStr = startDateStr,
+            endDateStr = targetEndDate,
+            totalCaloriesConsumed = totalConsumed,
+            totalCalorieBudget = totalBudget,
+            averageDailyCalories = avgConsumed,
+            dailyCalorieBudget = dailyBudget,
+            totalNetDeficitKcal = netDeficitKcal,
+            estimatedKgLost = (estimatedKgLost * 100f).roundToInt() / 100f,
+            daysOnTarget = daysOnTarget,
+            totalDaysWithLogs = daysWithLogs,
+            dayStatuses = dayStatuses
+        )
     }
 
     override fun addBodyPhoto(photoPath: String, pose: BodyPose, weightKg: Float, notes: String) {

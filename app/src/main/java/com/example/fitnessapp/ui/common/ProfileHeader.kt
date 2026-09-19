@@ -42,6 +42,7 @@ fun ProfileSwitcherHeader(
     activeProfile: UserProfile,
     partnerName: String = "Partner",
     isPartnerSynced: Boolean = false,
+    streakDays: Int = 0,
     onNavigateToPartner: () -> Unit = {},
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
@@ -93,35 +94,61 @@ fun ProfileSwitcherHeader(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // User Identity Chip + Partner Sync Status Pill Row
+        // User Identity Chip + Streak Pill + Partner Sync Status Pill Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // User identity chip
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // User identity chip
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
                 ) {
-                    Icon(
-                        imageVector = if (activeProfile.gender == Gender.MALE) Icons.Default.Male else Icons.Default.Female,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.height(16.dp).width(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = activeProfile.name.ifBlank { "You" },
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (activeProfile.gender == Gender.MALE) Icons.Default.Male else Icons.Default.Female,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.height(16.dp).width(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = activeProfile.name.ifBlank { "You" },
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                // Consistency Streak Pill
+                if (streakDays > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFFFFF3E0),
+                        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🔥 $streakDays ${if (streakDays == 1) "day" else "days"}",
+                                color = Color(0xFFE65100),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
             }
 

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -56,10 +57,12 @@ import java.util.Locale
 fun MealListCard(
     meals: List<MealLog>,
     onDeleteMeal: (String) -> Unit,
+    onRepeatMeal: ((MealLog) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedFilter by remember { mutableStateOf<MealType?>(null) }
     var mealToDelete by remember { mutableStateOf<MealLog?>(null) }
+    var mealToRepeat by remember { mutableStateOf<MealLog?>(null) }
 
     val filteredMeals = if (selectedFilter == null) {
         meals
@@ -161,12 +164,37 @@ fun MealListCard(
                 filteredMeals.forEach { meal ->
                     ExpandableMealItemRow(
                         meal = meal,
-                        onDeleteRequest = { mealToDelete = meal }
+                        onDeleteRequest = { mealToDelete = meal },
+                        onRepeatRequest = if (onRepeatMeal != null) { { mealToRepeat = meal } } else null
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
+    }
+
+    // Repeat Confirmation Dialog
+    mealToRepeat?.let { meal ->
+        AlertDialog(
+            onDismissRequest = { mealToRepeat = null },
+            title = { Text("Repeat Meal Today?", fontWeight = FontWeight.Bold) },
+            text = { Text("Log \"${meal.title}\" (${meal.calories} kcal) as a new meal for today?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRepeatMeal?.invoke(meal)
+                        mealToRepeat = null
+                    }
+                ) {
+                    Text("Copy to Today")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { mealToRepeat = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Delete Confirmation Dialog
@@ -224,7 +252,8 @@ private fun FilterTabChip(
 @Composable
 private fun ExpandableMealItemRow(
     meal: MealLog,
-    onDeleteRequest: () -> Unit
+    onDeleteRequest: () -> Unit,
+    onRepeatRequest: (() -> Unit)? = null
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val timeFormatted = remember(meal.timestamp) {
@@ -292,13 +321,26 @@ private fun ExpandableMealItemRow(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = "${meal.calories} kcal",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                if (onRepeatRequest != null) {
+                    IconButton(onClick = onRepeatRequest, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Repeat meal today",
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
                 IconButton(onClick = onDeleteRequest, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Default.Delete,

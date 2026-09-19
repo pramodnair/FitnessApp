@@ -5,19 +5,23 @@ import androidx.lifecycle.viewModelScope
 import com.example.fitnessapp.FitnessApplication
 import com.example.fitnessapp.data.model.DailyNutritionSummary
 import com.example.fitnessapp.data.model.MealLog
+import com.example.fitnessapp.data.model.MealType
 import com.example.fitnessapp.data.model.PartnerDuelSummary
 import com.example.fitnessapp.data.model.UserProfile
+import com.example.fitnessapp.data.model.WeeklyNutritionSummary
 import com.example.fitnessapp.data.repository.FitnessRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 class DashboardViewModel(
     private val repository: FitnessRepository = FitnessApplication.instance.repository
@@ -81,6 +85,25 @@ class DashboardViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.todaySummary.value)
 
+    val weeklySummary: StateFlow<WeeklyNutritionSummary> = combine(
+        repository.todaySummary,
+        _selectedDate
+    ) { _, date ->
+        repository.getWeeklyNutritionSummary(date)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        repository.getWeeklyNutritionSummary()
+    )
+
+    val loggingStreak: StateFlow<Int> = repository.todaySummary.map {
+        repository.calculateLoggingStreak()
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        repository.calculateLoggingStreak()
+    )
+
     fun selectPreviousDay() {
         val cal = Calendar.getInstance()
         val current = try { dateFormat.parse(_selectedDate.value) } catch (e: Exception) { null }
@@ -112,5 +135,27 @@ class DashboardViewModel(
 
     fun deleteMeal(mealId: String) {
         repository.deleteMeal(mealId)
+    }
+
+    fun repeatMealToToday(meal: MealLog) {
+        repository.repeatMealToday(meal)
+    }
+
+    fun logQuickCalories(calories: Int, mealType: MealType, note: String = "Quick Add") {
+        val date = _selectedDate.value
+        val title = if (note.isNotBlank() && note != "Quick Add") note else "Quick Add (${calories} kcal)"
+        val meal = MealLog(
+            id = UUID.randomUUID().toString(),
+            userId = repository.activeProfile.value.id,
+            title = title,
+            calories = calories,
+            proteinG = 0f,
+            carbsG = 0f,
+            fatG = 0f,
+            mealType = mealType,
+            date = date,
+            timestamp = System.currentTimeMillis()
+        )
+        repository.addMeal(meal)
     }
 }

@@ -22,18 +22,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -74,6 +77,8 @@ fun WeightTrackerScreen(
 
     var showAddWeightDialog by remember { mutableStateOf(false) }
     var showEditStartWeightDialog by remember { mutableStateOf(false) }
+    var logToEdit by remember { mutableStateOf<WeightLog?>(null) }
+    var logToDelete by remember { mutableStateOf<WeightLog?>(null) }
 
     val idealRange = BmiCalculator.getIdealWeightRange(activeProfile.heightCm)
     val userLogs = weightHistory.filter { it.userId == activeProfile.id }
@@ -376,7 +381,11 @@ fun WeightTrackerScreen(
                 )
             } else {
                 filteredLogs.forEach { log ->
-                    WeightLogRow(log = log)
+                    WeightLogRow(
+                        log = log,
+                        onEdit = { logToEdit = log },
+                        onDelete = { logToDelete = log }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -395,6 +404,43 @@ fun WeightTrackerScreen(
             )
         }
 
+        if (logToEdit != null) {
+            EditWeightEntryDialog(
+                log = logToEdit!!,
+                onConfirm = { weight, notes ->
+                    viewModel.editWeightEntry(logToEdit!!.id, weight, notes)
+                    logToEdit = null
+                },
+                onDismiss = { logToEdit = null }
+            )
+        }
+
+        if (logToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { logToDelete = null },
+                title = { Text("Delete Weight Entry", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text("Are you sure you want to delete the entry of ${logToDelete!!.weightKg} kg on ${logToDelete!!.date}?")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.deleteWeightEntry(logToDelete!!.id)
+                            logToDelete = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.onError)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { logToDelete = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
         if (showEditStartWeightDialog) {
             EditStartWeightDialog(
                 currentStartWeight = activeProfile.startWeightKg,
@@ -410,24 +456,31 @@ fun WeightTrackerScreen(
 }
 
 @Composable
-private fun WeightLogRow(log: WeightLog) {
+private fun WeightLogRow(
+    log: WeightLog,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .padding(14.dp),
+            .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
                 imageVector = Icons.Default.MonitorWeight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Column {
                 Text(log.date, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 if (log.notes.isNotBlank()) {
@@ -436,9 +489,38 @@ private fun WeightLogRow(log: WeightLog) {
             }
         }
 
-        Column(horizontalAlignment = Alignment.End) {
-            Text("${log.weightKg} kg", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-            Text("BMI ${log.bmi}", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${log.weightKg} kg", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                Text("BMI ${log.bmi}", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+            }
+
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit entry",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete entry",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -524,6 +606,94 @@ private fun AddWeightDialog(
                 }
             ) {
                 Text("Save Weight")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun EditWeightEntryDialog(
+    log: WeightLog,
+    onConfirm: (Float, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var weightText by remember { mutableStateOf(log.weightKg.toString()) }
+    var notesText by remember { mutableStateOf(log.notes) }
+
+    fun adjustWeight(delta: Float) {
+        val curr = weightText.toFloatOrNull() ?: log.weightKg
+        val next = (curr + delta).coerceIn(30f, 250f)
+        weightText = String.format(Locale.getDefault(), "%.1f", next)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Weight Entry (${log.date})", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = weightText,
+                    onValueChange = { weightText = it },
+                    label = { Text("Weight (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { adjustWeight(-0.5f) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                    ) {
+                        Text("-0.5", fontSize = 11.sp, maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { adjustWeight(-0.1f) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                    ) {
+                        Text("-0.1", fontSize = 11.sp, maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { adjustWeight(0.1f) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                    ) {
+                        Text("+0.1", fontSize = 11.sp, maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { adjustWeight(0.5f) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                    ) {
+                        Text("+0.5", fontSize = 11.sp, maxLines = 1)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = notesText,
+                    onValueChange = { notesText = it },
+                    label = { Text("Notes (optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val w = weightText.toFloatOrNull() ?: log.weightKg
+                    onConfirm(w, notesText)
+                }
+            ) {
+                Text("Update")
             }
         },
         dismissButton = {

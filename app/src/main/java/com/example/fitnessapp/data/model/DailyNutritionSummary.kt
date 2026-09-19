@@ -49,3 +49,36 @@ data class DailyNutritionSummary(
             CalorieWarningLevel.SAFE -> null
         }
 }
+
+@Serializable
+data class DayDeficitStatus(
+    val dateStr: String,
+    val dayLabel: String,
+    val caloriesConsumed: Int,
+    val calorieBudget: Int,
+    val isWithinBudget: Boolean,
+    val hasLogs: Boolean,
+    val isFuture: Boolean = false
+) {
+    val isUnderBudget: Boolean get() = isWithinBudget
+}
+
+@Serializable
+data class WeeklyNutritionSummary(
+    val startDateStr: String = "",
+    val endDateStr: String = "",
+    val totalCaloriesConsumed: Int = 0,
+    val totalCalorieBudget: Int = 0,
+    val averageDailyCalories: Int = 0,
+    val dailyCalorieBudget: Int = 0,
+    val totalNetDeficitKcal: Int = 0,
+    val estimatedKgLost: Float = 0f,
+    val daysOnTarget: Int = 0,
+    val totalDaysWithLogs: Int = 0,
+    val dayStatuses: List<DayDeficitStatus> = emptyList()
+) {
+    val totalNetDeficit: Int get() = totalNetDeficitKcal
+    val days: List<DayDeficitStatus> get() = dayStatuses
+    val daysOnTrack: Int get() = daysOnTarget
+}
+
