@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingFlat
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingFlat
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -144,7 +144,7 @@ fun WeightTrendChart(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Default.ShowChart,
+                                Icons.AutoMirrored.Filled.ShowChart,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
@@ -229,7 +229,7 @@ fun WeightTrendChart(
                     val isGaining = weeklyRate > 0.05f
                     val paceColor = if (isLosing) Color(0xFF2E7D32) else if (isGaining) Color(0xFFE65100) else MaterialTheme.colorScheme.primary
                     val paceBg = paceColor.copy(alpha = 0.12f)
-                    val paceIcon = if (isLosing) Icons.Default.TrendingDown else if (isGaining) Icons.Default.TrendingUp else Icons.Default.TrendingFlat
+                    val paceIcon = if (isLosing) Icons.AutoMirrored.Filled.TrendingDown else if (isGaining) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingFlat
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),

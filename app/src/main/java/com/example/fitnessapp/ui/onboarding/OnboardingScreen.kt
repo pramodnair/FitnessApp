@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -46,7 +47,6 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -426,7 +426,7 @@ private fun WelcomeSlide() {
         Spacer(modifier = Modifier.height(12.dp))
 
         FeatureHighlightCard(
-            icon = Icons.Default.TrendingDown,
+            icon = Icons.AutoMirrored.Filled.TrendingDown,
             title = "7-Day Smoothed Weight Trends",
             description = "Mifflin-St Jeor metabolic engine with 7-day exponential moving average to filter daily water fluctuations."
         )
