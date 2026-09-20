@@ -26,6 +26,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -285,25 +290,84 @@ fun FoodScannerScreen(
                 }
             }
 
-            // Food Targeting Viewfinder Reticle Overlay
+            // Food Targeting Viewfinder Reticle Overlay (Spacious & Modern)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 40.dp, vertical = 90.dp),
+                    .padding(horizontal = 24.dp, vertical = 70.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(280.dp)
-                        .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(24.dp)),
+                        .fillMaxWidth(0.88f)
+                        .aspectRatio(1f)
+                        .drawBehind {
+                            val stroke = 3.dp.toPx()
+                            val arm = 36.dp.toPx()
+                            val r = 22.dp.toPx()
+                            val bracketColor = Color.White.copy(alpha = 0.85f)
+
+                            // Top-Left corner
+                            val tl = Path().apply {
+                                moveTo(0f, arm)
+                                lineTo(0f, r)
+                                quadraticTo(0f, 0f, r, 0f)
+                                lineTo(arm, 0f)
+                            }
+                            drawPath(tl, bracketColor, style = Stroke(stroke, cap = StrokeCap.Round))
+
+                            // Top-Right corner
+                            val tr = Path().apply {
+                                moveTo(size.width - arm, 0f)
+                                lineTo(size.width - r, 0f)
+                                quadraticTo(size.width, 0f, size.width, r)
+                                lineTo(size.width, arm)
+                            }
+                            drawPath(tr, bracketColor, style = Stroke(stroke, cap = StrokeCap.Round))
+
+                            // Bottom-Left corner
+                            val bl = Path().apply {
+                                moveTo(0f, size.height - arm)
+                                lineTo(0f, size.height - r)
+                                quadraticTo(0f, size.height, r, size.height)
+                                lineTo(arm, size.height)
+                            }
+                            drawPath(bl, bracketColor, style = Stroke(stroke, cap = StrokeCap.Round))
+
+                            // Bottom-Right corner
+                            val br = Path().apply {
+                                moveTo(size.width - arm, size.height)
+                                lineTo(size.width - r, size.height)
+                                quadraticTo(size.width, size.height, size.width, size.height - r)
+                                lineTo(size.width, size.height - arm)
+                            }
+                            drawPath(br, bracketColor, style = Stroke(stroke, cap = StrokeCap.Round))
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Align food dish inside frame",
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.Black.copy(alpha = 0.45f),
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Position food in camera view",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Full plates, bowls & snacks supported",
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 }
             }
 

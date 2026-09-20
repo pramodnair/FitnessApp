@@ -165,11 +165,11 @@ fun ManualFoodEntryDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MealType.entries.forEach { type ->
-                        val (iconLabel, defaultHour) = when (type) {
-                            MealType.BREAKFAST -> "🍳 Breakfast" to 8
-                            MealType.LUNCH -> "🍛 Lunch" to 13
-                            MealType.SNACK -> "🍎 Snack" to 17
-                            MealType.DINNER -> "🍲 Dinner" to 20
+                        val iconLabel = when (type) {
+                            MealType.BREAKFAST -> "🍳 Breakfast"
+                            MealType.LUNCH -> "🍛 Lunch"
+                            MealType.SNACK -> "🍎 Snack"
+                            MealType.DINNER -> "🍲 Dinner"
                         }
                         val isSelected = selectedMealType == type
                         Box(
@@ -182,8 +182,6 @@ fun ManualFoodEntryDialog(
                                 )
                                 .clickable {
                                     selectedMealType = type
-                                    selectedHour = defaultHour
-                                    selectedMinute = 30
                                 }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
