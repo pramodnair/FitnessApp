@@ -562,46 +562,6 @@ fun FoodSearchScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Quick Meal Type Selector Pills
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            MealType.entries.forEach { type ->
-                                val iconLabel = when (type) {
-                                    MealType.BREAKFAST -> "🍳 Breakfast"
-                                    MealType.LUNCH -> "🍛 Lunch"
-                                    MealType.SNACK -> "🍎 Snack"
-                                    MealType.DINNER -> "🍲 Dinner"
-                                }
-                                val isSelected = selectedMealType == type
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                                        )
-                                        .clickable {
-                                            viewModel.onMealTypeSelected(type)
-                                        }
-                                        .padding(vertical = 7.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = iconLabel,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
                         // Log Meal CTA Button
                         Button(
                             onClick = {
